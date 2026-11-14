@@ -1,5 +1,5 @@
 export type ServerConfig = {
-  mode: 'demo' | 'live'; appUrl: string; databaseUrl?: string; encryptionKey?: Buffer;
+  mode: 'demo' | 'live'; appUrl: string; databaseUrl?: string; databaseCa?: string; databasePoolMax?: number; encryptionKey?: Buffer;
   emailKey?: string; emailFrom?: string; paystackKey?: string; cronSecret?: string;
   secureCookies: boolean; testEmailSink?: { to: string; subject: string; text: string }[];
 };
@@ -12,7 +12,9 @@ export function configFromEnv(env: Record<string, string | undefined> = process.
   const url = new URL(appUrl);
   if (mode === 'live' && env.VERCEL && env.APP_URL && url.protocol !== 'https:') throw new Error('APP_URL must use HTTPS on Vercel');
   if (env.CRON_SECRET && env.CRON_SECRET.length < 32) throw new Error('CRON_SECRET must contain at least 32 characters');
-  return { mode, appUrl: url.origin, databaseUrl: env.DATABASE_URL, encryptionKey: key,
+  const poolMax = env.DATABASE_POOL_MAX ? Number(env.DATABASE_POOL_MAX) : undefined;
+  if (poolMax !== undefined && (!Number.isInteger(poolMax) || poolMax < 1)) throw new Error('DATABASE_POOL_MAX must be a positive integer');
+  return { mode, appUrl: url.origin, databaseUrl: env.DATABASE_URL, databaseCa: env.DATABASE_CA_CERT, databasePoolMax: poolMax, encryptionKey: key,
     emailKey: env.RESEND_API_KEY, emailFrom: env.EMAIL_FROM, paystackKey: env.PAYSTACK_SECRET_KEY,
     cronSecret: env.CRON_SECRET, secureCookies: url.protocol === 'https:' };
 }

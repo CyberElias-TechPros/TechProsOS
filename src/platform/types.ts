@@ -28,6 +28,15 @@ export interface Tenant {
   billingEmail?: string;
   bankDetails?: { bank: string; accountName: string; accountNumber: string };
   notificationEmails?: boolean;
+  /** Invoice identity. Never fall back to invented values — an unset field is omitted at print time. */
+  legalName?: string;
+  tradingName?: string;
+  rcNumber?: string;
+  tin?: string;
+  address?: string;
+  website?: string;
+  supportEmail?: string;
+  accountsEmail?: string;
 }
 
 export interface User {

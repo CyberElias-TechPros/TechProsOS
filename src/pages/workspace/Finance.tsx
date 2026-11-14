@@ -65,6 +65,7 @@ export default function Finance() {
                 <td className="num">{ngn(invoiceNet(i))}</td>
                 <td><StatusBadge s={i.status} /></td>
                 <td className="no-print">
+                  <button className="btn sm ghost" onClick={e => { e.stopPropagation(); setShowInvoice(i.id); }} aria-label={`View invoice ${i.number}`}>View</button>
                   {can('finance.invoice.manage') && i.status === 'draft' && (
                     <button className="btn sm secondary" onClick={async e => { e.stopPropagation(); try { await setInvoiceStatus(ctx, i.id, 'sent'); toast(`${i.number} sent`); } catch (err) { toast((err as Error).message, 'bad'); } }}>Send</button>
                   )}
@@ -139,8 +140,11 @@ function InvoiceSheet({ invoice: i, onClose }: { invoice: import('../../platform
         <div style={{ padding: 30 }}>
           <div className="row between" style={{ alignItems: 'flex-start' }}>
             <div>
-              <b style={{ fontSize: 18 }}>{tenant.name}</b>
-              <div className="sm muted">techpros.com.ng · Lagos, Nigeria</div>
+              <b style={{ fontSize: 18 }}>{tenant.tradingName || tenant.name}</b>
+              {tenant.legalName && <div className="sm muted">{tenant.legalName}{tenant.rcNumber ? ` · RC ${tenant.rcNumber}` : ''}</div>}
+              {tenant.address && <div className="sm muted" style={{ whiteSpace: 'pre-line' }}>{tenant.address}</div>}
+              <div className="sm muted">{[tenant.website, tenant.city ? `${tenant.city}, Nigeria` : ''].filter(Boolean).join(' · ')}</div>
+              {tenant.tin && <div className="xs muted">TIN {tenant.tin}</div>}
             </div>
             <div style={{ textAlign: 'right' }}>
               <div className="mono b" style={{ fontSize: 16 }}>{i.number}</div>
@@ -169,7 +173,17 @@ function InvoiceSheet({ invoice: i, onClose }: { invoice: import('../../platform
             ]} />
           </div>
           {t.wht > 0 && <p className="xs muted" style={{ marginTop: 14 }}>Note: withholding tax of {ngn(t.wht)} ({i.whtRate * 100}%) is deducted at source by the buyer and remitted to FIRS in our name. Please provide the credit note.</p>}
-          <p className="xs muted">Pay to: TechPros Services Ltd · GTBank 0123456789 · Reference {i.number}. Questions: accounts@techpros.com.ng</p>
+          {tenant.bankDetails ? (
+            <p className="xs muted">
+              Pay to: {tenant.bankDetails.accountName} · {tenant.bankDetails.bank} {tenant.bankDetails.accountNumber} · Reference {i.number}.
+              {tenant.accountsEmail ? ` Questions: ${tenant.accountsEmail}` : ''}
+            </p>
+          ) : (
+            <p className="xs muted" role="note">
+              Bank details are not set for this organisation. Add them in Admin → Organisation before sending this invoice.
+              Reference {i.number}.
+            </p>
+          )}
         </div>
       </div>
     </div>

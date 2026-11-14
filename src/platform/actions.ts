@@ -25,7 +25,9 @@ export async function runCommand(ctx: AccessContext, command: Command): Promise<
   }
   return demoDispatch(ctx, command);
 }
-export async function updateTenantProfile(ctx: AccessContext, patch: Partial<Pick<Tenant, 'name' | 'city' | 'industry'>>): Promise<void> { await runCommand(ctx, { type: 'tenant.update', ...patch }); }
+export async function updateTenantProfile(ctx: AccessContext, patch: Partial<Pick<Tenant,
+  'name' | 'city' | 'industry' | 'legalName' | 'tradingName' | 'rcNumber' | 'tin' | 'address' | 'website'
+  | 'supportEmail' | 'accountsEmail' | 'billingEmail' | 'bankDetails'>>): Promise<void> { await runCommand(ctx, { type: 'tenant.update', ...patch }); }
 export async function createBranch(ctx: AccessContext, name: string, city: string): Promise<void> { await runCommand(ctx, { type: 'branch.create', name, city }); }
 export async function createDepartment(ctx: AccessContext, name: string, branchId: string): Promise<void> { await runCommand(ctx, { type: 'department.create', name, branchId }); }
 export async function inviteUser(ctx: AccessContext, name: string, email: string, role: RoleId): Promise<void> { await runCommand(ctx, { type: 'user.invite', name, email, role }); }

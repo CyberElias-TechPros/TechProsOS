@@ -51,7 +51,7 @@ export async function handleApi(request: Request, deps: ApiDeps = {}): Promise<R
       return json({ error: { code: 'DEMO_MODE', message: 'Live integrations are disabled in demo mode' } }, 404);
     }
     if (missing.length) return json({ error: { code: 'SETUP_REQUIRED', message: 'Server configuration is incomplete', required: missing } }, 503);
-    const db = deps.db ?? postgres(config.databaseUrl!);
+    const db = deps.db ?? postgres(config.databaseUrl!, { caCert: config.databaseCa, max: config.databasePoolMax });
     if (path === '/api/ready') {
       const r = await db.query<{ count: string }>('SELECT count(*)::text AS count FROM schema_migrations');
       return json({ ok: Number(r.rows[0].count) > 0, database: 'reachable', migrations: Number(r.rows[0].count) });
