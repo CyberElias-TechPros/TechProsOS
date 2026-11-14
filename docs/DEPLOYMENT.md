@@ -1,7 +1,8 @@
 # Deployment & setup runbook
 
 ## 1. Provision infrastructure
-- PostgreSQL 15+ (Neon, Supabase, RDS, Cloud SQL, etc.). Require TLS (`sslmode=require` or `verify-full`).
+- PostgreSQL 15+ (Aiven, Neon, Supabase, RDS, Cloud SQL, etc.). Require TLS (`sslmode=require` or `verify-full`).
+  Providers that sign with a **private CA** (Aiven, some Supabase setups) also need `DATABASE_CA_CERT` — see §2a.
 - Vercel project connected to this repository (framework: Vite; API routes in `api/`).
 - Resend account with a verified sending domain.
 - Paystack account (live or test keys) with webhook configured.
@@ -15,6 +16,35 @@ Required for live mode:
 - `DATABASE_URL`
 - `DATA_ENCRYPTION_KEY` (base64 of 32 random bytes)
 - `CRON_SECRET` (≥32 random chars)
+
+Optional database tuning:
+- `DATABASE_CA_CERT` — private CA PEM, only for providers that need it (§2a).
+- `DATABASE_POOL_MAX` — connections per serverless instance (default 3). Total connections
+  ≈ this × concurrent instances. Aiven's entry tiers cap at **20**, so keep this at 2–3.
+
+### 2a. Private-CA providers (Aiven)
+
+Aiven for PostgreSQL signs its server certificate with a **per-project CA** that is not in
+Node's trust store. Two driver behaviours combine to break a naive setup:
+
+1. `pg` currently treats `sslmode=require` as `verify-full`, so it *does* verify the chain.
+2. `pg` merges the parsed connection string **over** the options object, so an `sslmode` in
+   the URL silently discards any `ssl: { ca }` you pass in code.
+
+`server/db.ts` handles both: it strips `sslmode` from the URL and expresses the same intent as
+an explicit `ssl` object, so the CA survives. You only need to supply the certificate:
+
+1. Aiven Console → your service → **Connection information** → **CA certificate** → *Show* / *Download*.
+2. Put the whole PEM in `DATABASE_CA_CERT` (Vercel accepts multiline values; escaped `\n`
+   and base64 also work).
+3. Keep `?sslmode=require` in `DATABASE_URL`.
+
+Verification stays **on**. Never "fix" this with `rejectUnauthorized: false` — that removes
+protection against machine-in-the-middle attacks on the database link. `sslmode=no-verify`
+exists as an explicit escape hatch for local debugging only and must not be used in production.
+
+The CA certificate is **not a secret** (it is a public certificate), but it is still kept in
+environment config rather than the repo so it can be rotated with the service.
 
 Required for email flows:
 - `RESEND_API_KEY`

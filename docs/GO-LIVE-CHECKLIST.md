@@ -47,6 +47,8 @@ Set these in **Vercel → Project → Settings → Environment Variables**, scop
 | `APP_MODE` | A | `live` (anything other than `demo` = live) | Set literally to `live` |
 | `APP_URL` | A | Full origin, **HTTPS** on Vercel. Must equal the browser's `Origin` **exactly** — scheme + host + port. Mismatch ⇒ every write returns `403 ORIGIN_REJECTED`. | `https://app.yourdomain.ng` |
 | `DATABASE_URL` | A | `postgresql://user:pass@host:5432/db?sslmode=require` — including `sslmode=require` or `verify-full` switches on TLS with **certificate verification enabled** | From your DB provider (use the pooled URI) |
+| `DATABASE_CA_CERT` | A, **Aiven only** | PEM certificate; inline, `\n`-escaped, or base64 | Aiven Console → Connection information → CA certificate → Show |
+| `DATABASE_POOL_MAX` | optional | positive integer, default 3 | Set 2–3; Aiven entry tier caps at 20 total |
 | `DATA_ENCRYPTION_KEY` | A | **base64 of exactly 32 bytes.** Wrong length throws at boot. Encrypts MFA secrets (AES-256-GCM). | `openssl rand -base64 32` |
 | `CRON_SECRET` | A | **≥ 32 characters.** Sent as `Authorization: Bearer <value>` | `openssl rand -hex 32` |
 | `RESEND_API_KEY` | B | Resend secret API key | Resend dashboard → API Keys |
@@ -59,9 +61,10 @@ Set these in **Vercel → Project → Settings → Environment Variables**, scop
 1. **One canonical origin.** If `APP_URL=https://app.techpros.com.ng` but someone opens
    `https://techpros-one.vercel.app`, reads work and **all mutations fail** (CSRF/origin check).
    Decide the canonical host and redirect the others to it.
-2. **TLS certificate chain.** The pool sets `rejectUnauthorized: true`. Providers using a
-   private CA (some Supabase configurations) will fail to connect. Either pick a provider with a
-   publicly-trusted cert, or send me the CA bundle and I'll wire `sslrootcert`.
+2. **TLS certificate chain — Aiven.** Aiven uses a per-project private CA, so it needs
+   `DATABASE_CA_CERT`. Support for this is now implemented (`server/db.ts`, `resolvePgConnection`)
+   with 14 regression tests. Without the CA the connection fails with
+   `self-signed certificate in certificate chain`. See `docs/DEPLOYMENT.md` §2a.
 
 ---
 
