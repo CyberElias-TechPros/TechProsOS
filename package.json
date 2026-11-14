@@ -1,0 +1,37 @@
+{
+  "name": "techpros-one",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "TechPros One — the unified IT operations & business technology platform",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -b --noEmit"
+  },
+  "dependencies": {
+    "framer-motion": "^11.11.17",
+    "qrcode": "^1.5.4",
+    "react-router-dom": "^6.28.0",
+    "recharts": "^2.13.3",
+    "zustand": "^5.0.1"
+  },
+  "devDependencies": {
+    "@fontsource-variable/inter": "^5.1.0",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.0.1",
+    "@types/qrcode": "^1.5.5",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^4.3.3",
+    "jsdom": "^25.0.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10",
+    "vitest": "^2.1.4"
+  }
+}
