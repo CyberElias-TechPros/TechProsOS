@@ -2,10 +2,10 @@
 import { useMemo, useRef, useState, useEffect } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { useSessionInfo, useUiPrefs, useSession } from '../platform/session';
+import { useSessionInfo, useUiPrefs, useSignOut, useLivePolling } from '../platform/session';
 import { useData } from '../platform/store';
 import { visibleTickets } from '../platform/metrics';
-import { markNotificationRead } from '../platform/db';
+import { markNotificationRead } from '../platform/actions';
 import { Icon } from '../components/icons';
 import { pretty, StatusBadge, ThemeToggle, toast, UserAvatar } from '../components/ui';
 import { navFor } from './nav';
@@ -95,13 +95,13 @@ function NotificationsBell() {
         <div className="notif-pop">
           <div className="row between" style={{ padding: '11px 14px', borderBottom: '1px solid var(--line)' }}>
             <b className="sm">Notifications</b>
-            {unread > 0 && <button className="btn ghost sm" onClick={() => markNotificationRead(info.tenant.id, info.user.id)}>Mark all read</button>}
+            {unread > 0 && <button className="btn ghost sm" onClick={async () => await markNotificationRead(info.ctx)}>Mark all read</button>}
           </div>
           <div style={{ overflow: 'auto' }}>
             {notifs.length === 0 && <div className="empty" style={{ padding: 24 }}>No notifications yet</div>}
             {notifs.slice(0, 30).map(n => (
               <button key={n.id} className={`notif-item ${n.read ? '' : 'unread'}`}
-                onClick={() => { markNotificationRead(info.tenant.id, info.user.id, n.id); if (n.link) { navigate(n.link); setOpen(false); } }}>
+                onClick={async () => { await markNotificationRead(info.ctx, n.id); if (n.link) { navigate(n.link); setOpen(false); } }}>
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <div className="b sm">{n.title}</div>
                   <div className="sm muted clamp2">{n.body}</div>
@@ -119,7 +119,7 @@ function NotificationsBell() {
 function UserMenu() {
   const info = useSessionInfo();
   const navigate = useNavigate();
-  const signOut = useSession(s => s.signOut);
+  const signOut = useSignOut();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -147,6 +147,7 @@ function UserMenu() {
             <div className="xs" style={{ marginTop: 3 }}><StatusBadge s={info.role} /></div>
           </div>
           <button onClick={() => { navigate('/app/notifications'); setOpen(false); }}><Icon name="bell" size={14} /> My notifications</button>
+          <button onClick={() => { navigate('/app/account'); setOpen(false); }}><Icon name="user" size={14} /> Account & security</button>
           <button onClick={() => { signOut(); navigate('/login'); toast('Signed out'); }}><Icon name="logout" size={14} /> Sign out</button>
         </div>
       )}
@@ -155,6 +156,7 @@ function UserMenu() {
 }
 
 export function AppShell() {
+  useLivePolling();
   const info = useSessionInfo();
   const { prefs, setPrefs } = useUiPrefs();
   const [paletteOpen, setPaletteOpen] = useState(false);

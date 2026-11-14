@@ -2,7 +2,7 @@
 import { useMemo, useState } from 'react';
 import { useSessionCtx } from '../../platform/session';
 import { useData } from '../../platform/store';
-import { saveArticle, saveDocumentRecord } from '../../platform/db';
+import { saveArticle, saveDocumentRecord } from '../../platform/actions';
 import { Badge, Empty, Modal, PageHead, Table, Tabs, toast } from '../../components/ui';
 import { Icon } from '../../components/icons';
 import { daysUntil, fmtDate, fmtTimeAgo } from '../../platform/util';
@@ -110,8 +110,8 @@ export default function Docs() {
 function ArticleComposer({ onClose }: { onClose: () => void }) {
   const { ctx } = useSessionCtx();
   const [f, setF] = useState({ title: '', category: 'How-to', tags: '', body: '', publish: true });
-  const submit = () => {
-    saveArticle(ctx, {
+  const submit = async () => {
+    await saveArticle(ctx, {
       title: f.title.trim(), body: f.body.trim(), category: f.category,
       tags: f.tags.split(',').map(s => s.trim()).filter(Boolean),
       publish: f.publish,
@@ -143,8 +143,8 @@ function ArticleComposer({ onClose }: { onClose: () => void }) {
 function DocumentComposer({ onClose }: { onClose: () => void }) {
   const { ctx } = useSessionCtx();
   const [f, setF] = useState({ title: '', kind: 'sop' as 'policy' | 'sop' | 'diagram' | 'manual' | 'report' | 'handover', summary: '', reviewInDays: 365 });
-  const submit = () => {
-    saveDocumentRecord(ctx, {
+  const submit = async () => {
+    await saveDocumentRecord(ctx, {
       title: f.title.trim(), kind: f.kind, summary: f.summary.trim(),
       expiresAt: f.reviewInDays > 0 ? new Date(Date.now() + f.reviewInDays * 86_400_000).toISOString() : undefined,
     });

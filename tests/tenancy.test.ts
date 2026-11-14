@@ -12,7 +12,7 @@ beforeEach(() => resetWorkspaceData());
 
 const ctxFor = (userId: string, tenantId: string) => {
   const t = getData().tenants.find(x => x.id === tenantId)!;
-  const ctx = accessContextFor(getData().memberships, userId, tenantId, t.providerId);
+  const ctx = accessContextFor(getData().memberships, userId, tenantId, t.providerId, getData().delegations);
   if (!ctx) throw new Error('no access');
   return ctx;
 };
@@ -39,7 +39,7 @@ describe('tenant isolation through the data layer', () => {
     expect(seen.some(t => t.tenantId === DEMO.greenfield)).toBe(false);
     // direct mutation of a foreign ticket is a no-op, not a leak
     const before = getData().tickets.find(t => t.id === 'tk_100')!.status;
-    setTicketStatus(ifeoma, 'tk_100', 'closed'); // wrong tenant → silently ignored
+    expect(() => setTicketStatus(ifeoma, 'tk_100', 'closed')).toThrow(/not found|outside/i);
     expect(getData().tickets.find(t => t.id === 'tk_100')!.status).toBe(before);
   });
 
@@ -56,16 +56,17 @@ describe('tenant isolation through the data layer', () => {
     const t = getData().tickets.find(x => x.id === id)!;
     expect(t.priority).toBe('critical');
     expect(t.responseDueAt && t.resolveDueAt).toBeTruthy();
-    expect(getData().auditLogs.some(a => a.entityId === id && a.action === 'ticket.created')).toBe(true);
+    expect(getData().auditLogs.some(a => a.entityId === id && a.action === 'ticket.create')).toBe(true);
   });
 
   it('assignment notifies the assignee and records an audit entry', () => {
     const ngozi = ctxFor(DEMO_USERS.ngozi, DEMO.greenfield);
-    assignTicket(ngozi, 'tk_100', DEMO_USERS.emeka);
+    const openTicket = getData().tickets.find(t => t.tenantId === DEMO.greenfield && ['new', 'triaged', 'in_progress', 'pending'].includes(t.status))!;
+    assignTicket(ngozi, openTicket.id, DEMO_USERS.emeka);
     const d = getData();
-    expect(d.tickets.find(t => t.id === 'tk_100')!.assigneeId).toBe(DEMO_USERS.emeka);
+    expect(d.tickets.find(t => t.id === openTicket.id)!.assigneeId).toBe(DEMO_USERS.emeka);
     expect(d.notifications.some(n => n.userId === DEMO_USERS.emeka && n.title.includes('assigned'))).toBe(true);
-    expect(d.auditLogs.some(a => a.entityId === 'tk_100' && a.action === 'ticket.assigned')).toBe(true);
+    expect(d.auditLogs.some(a => a.entityId === openTicket.id && a.action === 'ticket.assign')).toBe(true);
   });
 
   it('device-outage automation dedupes and creates a linked critical incident', () => {

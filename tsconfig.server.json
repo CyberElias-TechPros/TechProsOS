@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "types": ["node"],
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
+  },
+  "include": ["server", "api", "scripts", "src/platform/types.ts", "src/platform/contracts.ts", "src/platform/operations.ts", "src/platform/permissions.ts", "src/platform/sla.ts", "src/platform/money.ts", "src/platform/metrics.ts", "src/platform/reporting.ts", "src/platform/util.ts"]
+}

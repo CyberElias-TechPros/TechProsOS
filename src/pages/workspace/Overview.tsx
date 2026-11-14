@@ -8,7 +8,7 @@ import { itsmStats, slaCompliance, visibleTickets, slaBadgeState, riskExposure, 
 import { Badge, Empty, PageHead, StatusBadge, toast } from '../../components/ui';
 import { Icon } from '../../components/icons';
 import { fmtDuration, fmtTimeAgo, pct } from '../../platform/util';
-import { acknowledgeAlert, simulateDeviceOutage } from '../../platform/db';
+import { acknowledgeAlert, simulateDeviceOutage } from '../../platform/actions';
 import { branchName } from './lookups';
 import { CountUp } from '../../components/bits/CountUp';
 import { Reveal } from '../../app/motion';
@@ -145,14 +145,14 @@ export default function Overview() {
                   </span>
                 </span>
                 {can('infrastructure.alert.manage') && (
-                  <button className="btn sm secondary" onClick={() => { acknowledgeAlert(ctx, a.id); toast('Alert acknowledged'); }}>Ack</button>
+                  <button className="btn sm secondary" onClick={async () => { await acknowledgeAlert(ctx, a.id); toast('Alert acknowledged'); }}>Ack</button>
                 )}
               </div>
             );
           })}
           {can('infrastructure.device.manage') && (
             <button className="btn ghost sm" style={{ alignSelf: 'flex-start' }}
-              onClick={() => { const anyDev = devices.find(d => d.status === 'up'); if (anyDev) { const r = simulateDeviceOutage(ctx, anyDev.id); toast(r.deduped ? 'Outage already raised for this device' : `Simulated outage → incident created`, 'info'); } }}>
+              onClick={async () => { const anyDev = devices.find(d => d.status === 'up'); if (anyDev) { const r = await simulateDeviceOutage(ctx, anyDev.id); toast(r.deduped ? 'Outage already raised for this device' : `Simulated outage → incident created`, 'info'); } }}>
               <Icon name="zap" size={13} /> Simulate an outage (demo)
             </button>
           )}

@@ -2,7 +2,7 @@
 import { useMemo, useState } from 'react';
 import { useSessionCtx } from '../../platform/session';
 import { useData } from '../../platform/store';
-import { addFinding, setFindingStatus, setRiskStatus, upsertRisk } from '../../platform/db';
+import { addFinding, setFindingStatus, setRiskStatus, upsertRisk } from '../../platform/actions';
 import { riskScore as rscore } from '../../platform/metrics';
 import type { Finding, Risk, RiskStatus } from '../../platform/types';
 import { Badge, Bar, Empty, Modal, PageHead, StatusBadge, Table, Tabs, toast } from '../../components/ui';
@@ -90,7 +90,7 @@ export default function Compliance() {
                 <td>
                   {manageable && f.status !== 'remediated' && (
                     <select className="select sm" style={{ width: 130 }} value={f.status} aria-label="Finding status"
-                      onChange={e => { setFindingStatus(ctx, f.id, e.target.value as Finding['status']); toast('Finding updated'); }}>
+                      onChange={async e => { await setFindingStatus(ctx, f.id, e.target.value as Finding['status']); toast('Finding updated'); }}>
                       {(['open', 'in_progress', 'remediated'] as const).map(s => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
                     </select>
                   )}
@@ -139,7 +139,7 @@ export default function Compliance() {
                 <div className="xs clamp2" style={{ marginTop: 3 }}>{r.treatment}</div>
                 {manageable && (
                   <select className="select sm" style={{ width: '100%', marginTop: 6 }} value={r.status} aria-label="Risk status"
-                    onChange={e => setRiskStatus(ctx, r.id, e.target.value as RiskStatus)}>
+                    onChange={async e => { await setRiskStatus(ctx, r.id, e.target.value as RiskStatus); }}>
                     {RISK_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 )}
@@ -177,7 +177,7 @@ function RiskComposer({ onClose }: { onClose: () => void }) {
         <div className="field"><label>Treatment plan</label>
           <textarea className="textarea" value={f.treatment} onChange={e => setF({ ...f, treatment: e.target.value })} placeholder="Reduce: enforce EDR patching within 72h…" /></div>
         <button className="btn block" disabled={f.title.trim().length < 5}
-          onClick={() => { upsertRisk(ctx, { title: f.title.trim(), category: f.category, likelihood: f.likelihood as 1 | 2 | 3 | 4 | 5, impact: f.impact as 1 | 2 | 3 | 4 | 5, treatment: f.treatment.trim() }); toast('Risk logged'); onClose(); }}>
+          onClick={async () => { await upsertRisk(ctx, { title: f.title.trim(), category: f.category, likelihood: f.likelihood as 1 | 2 | 3 | 4 | 5, impact: f.impact as 1 | 2 | 3 | 4 | 5, treatment: f.treatment.trim() }); toast('Risk logged'); onClose(); }}>
           Add to register — score {f.likelihood * f.impact}
         </button>
       </div>
@@ -202,7 +202,7 @@ function FindingComposer({ assessmentId, onClose }: { assessmentId: string; onCl
         <div className="field"><label>Evidence & detail</label>
           <textarea className="textarea" value={f.detail} onChange={e => setF({ ...f, detail: e.target.value })} /></div>
         <button className="btn block" disabled={f.title.trim().length < 5}
-          onClick={() => { addFinding(ctx, { assessmentId, title: f.title.trim(), severity: f.severity, detail: f.detail.trim() }); toast('Finding recorded'); onClose(); }}>
+          onClick={async () => { await addFinding(ctx, { assessmentId, title: f.title.trim(), severity: f.severity, detail: f.detail.trim() }); toast('Finding recorded'); onClose(); }}>
           Record finding
         </button>
       </div>

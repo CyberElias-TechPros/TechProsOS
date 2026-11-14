@@ -1,103 +1,105 @@
-/**
- * SLA engine — README Module 02: business-hours-aware first-response and
- * resolution targets, plus the impact × urgency priority matrix.
- * Working calendar is evaluated in UTC; the demo tenant pins a Lagos calendar
- * (UTC+1) by storing its hours already shifted, keeping the math timezone-free.
+/** Business-minute SLA math in an IANA timezone. Instants remain ISO UTC.
+ * Legacy demo/test calendars without a timezone are explicitly UTC; new policies
+ * use Africa/Lagos and local working hours (never manually shifted hours).
  */
 import type { ImpactUrgency, Priority, SlaPolicy } from './types';
 import { DAYS, MINUTES } from './util';
 
-/** Priority matrix (impact rows × urgency columns), per README §Module 02. */
 export const PRIORITY_MATRIX: Record<ImpactUrgency, Record<ImpactUrgency, Priority>> = {
-  high:   { high: 'critical', medium: 'high',   low: 'high' },
-  medium: { high: 'high',     medium: 'medium', low: 'medium' },
-  low:    { high: 'medium',   medium: 'low',    low: 'low' },
+  high: { high: 'critical', medium: 'high', low: 'high' },
+  medium: { high: 'high', medium: 'medium', low: 'medium' },
+  low: { high: 'medium', medium: 'low', low: 'low' },
 };
-
-export function priorityFrom(impact: ImpactUrgency, urgency: ImpactUrgency): Priority {
-  return PRIORITY_MATRIX[impact][urgency];
-}
-
-/** README §2 example targets, expressed in business minutes (8-hour workdays). */
+export function priorityFrom(impact: ImpactUrgency, urgency: ImpactUrgency): Priority { return PRIORITY_MATRIX[impact][urgency]; }
 export const DEFAULT_SLA_TARGETS: SlaPolicy['targets'] = {
-  critical: { response: 15,  resolve: 240 },   // 15 min / 4 hours
-  high:     { response: 30,  resolve: 480 },   // 30 min / 8 hours
-  medium:   { response: 240, resolve: 960 },   // 4 hours / 2 business days
-  low:      { response: 480, resolve: 2400 },  // 8 business hours / 5 business days
+  critical: { response: 15, resolve: 240 }, high: { response: 30, resolve: 480 },
+  medium: { response: 240, resolve: 960 }, low: { response: 480, resolve: 2400 },
 };
-
-export type WorkCal = Pick<SlaPolicy, 'workStartHour' | 'workEndHour' | 'workDays' | 'holidays'>;
-
-const dayKey = (d: Date): string => d.toISOString().slice(0, 10);
-
+export type WorkCal = Pick<SlaPolicy, 'workStartHour' | 'workEndHour' | 'workDays' | 'holidays'> & { timezone?: string };
+export function defaultCalendar(timezone = 'Africa/Lagos'): WorkCal {
+  return { workStartHour: 8, workEndHour: 18, workDays: [1, 2, 3, 4, 5], holidays: [], timezone };
+}
+function offsetAt(ms: number, zone: string): number {
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(ms));
+  const p = Object.fromEntries(parts.map(x => [x.type, x.value]));
+  return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second) - Math.floor(ms / 1000) * 1000;
+}
+function localParts(ms: number, zone: string) {
+  const d = new Date(ms + offsetAt(ms, zone));
+  return { year: d.getUTCFullYear(), month: d.getUTCMonth(), day: d.getUTCDate(), weekday: d.getUTCDay(), key: d.toISOString().slice(0, 10) };
+}
+function wallTime(year: number, month: number, day: number, hour: number, zone: string): number {
+  const wall = Date.UTC(year, month, day, hour);
+  let guess = wall - offsetAt(wall, zone);
+  guess = wall - offsetAt(guess, zone);
+  return guess;
+}
 export function isWorkDay(d: Date, cal: WorkCal): boolean {
-  return cal.workDays.includes(d.getUTCDay()) && !cal.holidays.includes(dayKey(d));
+  const p = localParts(d.getTime(), cal.timezone ?? 'UTC');
+  return cal.workDays.includes(p.weekday) && !cal.holidays.includes(p.key);
 }
-
-function workOpen(d: Date, cal: WorkCal): Date {
-  const o = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), cal.workStartHour, 0, 0, 0));
-  return o;
+function hours(ms: number, cal: WorkCal) {
+  const p = localParts(ms, cal.timezone ?? 'UTC');
+  return { open: wallTime(p.year, p.month, p.day, cal.workStartHour, cal.timezone ?? 'UTC'), close: wallTime(p.year, p.month, p.day, cal.workEndHour, cal.timezone ?? 'UTC') };
 }
-function workClose(d: Date, cal: WorkCal): Date {
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), cal.workEndHour, 0, 0, 0));
+function nextDay(ms: number, cal: WorkCal): number {
+  const p = localParts(ms, cal.timezone ?? 'UTC');
+  return wallTime(p.year, p.month, p.day + 1, 0, cal.timezone ?? 'UTC');
 }
-
-/** First working minute at or after `t`. Clamped to a 370-day search. */
 export function nextWorkStart(t: Date, cal: WorkCal): Date {
-  let d = new Date(t);
+  let ms = t.getTime();
+  if (!Number.isFinite(ms)) throw new Error('Invalid SLA start date');
   for (let i = 0; i < 370; i++) {
-    if (isWorkDay(d, cal)) {
-      const open = workOpen(d, cal);
-      const close = workClose(d, cal);
-      if (d < open) return open;
-      if (d < close) return d;
-      // past close: fall through to next day
+    if (isWorkDay(new Date(ms), cal)) {
+      const { open, close } = hours(ms, cal);
+      if (ms < open) return new Date(open);
+      if (ms < close) return new Date(ms);
     }
-    d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1, 0, 0, 0, 0));
+    ms = nextDay(ms, cal);
   }
-  return d;
+  throw new Error('SLA calendar has no working day in the next year');
 }
-
-/** Add `businessMinutes` to `fromIso`, counting only working minutes. */
 export function addBusinessMinutes(fromIso: string, businessMinutes: number, cal: WorkCal): string {
-  let cursor = nextWorkStart(new Date(fromIso), cal);
-  let remaining = Math.max(0, businessMinutes);
-  for (let guard = 0; guard < 370 && remaining > 0; guard++) {
-    const close = workClose(cursor, cal);
-    const avail = Math.max(0, Math.floor((close.getTime() - cursor.getTime()) / MINUTES));
-    if (avail >= remaining) return new Date(cursor.getTime() + remaining * MINUTES).toISOString();
-    remaining -= avail;
-    cursor = nextWorkStart(new Date(cursor.getTime() + DAYS), cal);
+  if (!Number.isFinite(businessMinutes) || businessMinutes < 0) throw new Error('Invalid SLA duration');
+  let cursor = nextWorkStart(new Date(fromIso), cal).getTime();
+  let remaining = Math.floor(businessMinutes);
+  for (let guard = 0; guard < 1500 && remaining > 0; guard++) {
+    const { close } = hours(cursor, cal);
+    const available = Math.max(0, Math.floor((close - cursor) / MINUTES));
+    if (available >= remaining) return new Date(cursor + remaining * MINUTES).toISOString();
+    remaining -= available;
+    cursor = nextWorkStart(new Date(nextDay(cursor, cal)), cal).getTime();
   }
-  return cursor.toISOString();
+  if (remaining > 0) throw new Error('SLA duration exceeds the supported calendar horizon');
+  return new Date(cursor).toISOString();
 }
-
-/** Business minutes elapsed between two instants (never negative, bounded to 370 iterations). */
 export function businessMinutesBetween(aIso: string, bIso: string, cal: WorkCal): number {
-  let from = new Date(aIso).getTime();
-  const to = new Date(bIso).getTime();
+  let from = new Date(aIso).getTime(); const to = new Date(bIso).getTime();
+  if (!Number.isFinite(from) || !Number.isFinite(to)) throw new Error('Invalid SLA interval');
   if (to <= from) return 0;
   let total = 0;
-  for (let guard = 0; guard < 400 && from < to; guard++) {
-    const d = new Date(from);
-    if (isWorkDay(d, cal)) {
-      const open = Math.max(workOpen(d, cal).getTime(), from);
-      const close = Math.min(workClose(d, cal).getTime(), to);
+  for (let guard = 0; guard < 3700 && from < to; guard++) {
+    if (isWorkDay(new Date(from), cal)) {
+      const h = hours(from, cal);
+      const open = Math.max(h.open, from), close = Math.min(h.close, to);
       if (close > open) total += Math.floor((close - open) / MINUTES);
     }
-    // jump to next midnight UTC (guaranteed progress)
-    from = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1, 0, 0, 0, 0)).getTime();
+    from = nextDay(from, cal);
   }
+  if (from < to) throw new Error('SLA interval exceeds the supported calendar horizon');
   return total;
 }
-
 export type SlaState = 'met' | 'on_track' | 'at_risk' | 'breached';
-
-/** State of a deadline: 'met' if completed in time, else relative to now. */
 export function slaState(dueAt: string | undefined, doneAt: string | undefined, nowMs = Date.now()): SlaState {
-  if (doneAt && dueAt) return new Date(doneAt).getTime() <= new Date(dueAt).getTime() ? 'met' : 'breached';
+  if (doneAt && dueAt) return Date.parse(doneAt) <= Date.parse(dueAt) ? 'met' : 'breached';
   if (!dueAt) return 'on_track';
-  const remain = new Date(dueAt).getTime() - nowMs;
-  if (remain < 0) return 'breached';
-  return remain < 4 * 60 * MINUTES ? 'at_risk' : 'on_track';
+  const remaining = Date.parse(dueAt) - nowMs;
+  return remaining < 0 ? 'breached' : remaining < 4 * 60 * MINUTES ? 'at_risk' : 'on_track';
 }
+export function addCalendarMonths(iso: string, months: number): string {
+  const d = new Date(iso); const day = d.getUTCDate();
+  d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() + months);
+  const last = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+  d.setUTCDate(Math.min(day, last)); return d.toISOString();
+}
+export const DAY_MS = DAYS;

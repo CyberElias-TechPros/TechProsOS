@@ -11,6 +11,11 @@ const PricingPage = lazy(() => import('./pages/marketing/Pricing'));
 const FreeToolsPage = lazy(() => import('./pages/marketing/FreeTools'));
 const LoginPage = lazy(() => import('./pages/auth/Login'));
 const OnboardingPage = lazy(() => import('./pages/auth/Onboarding'));
+const VerifyEmailPage = lazy(() => import('./pages/auth/VerifyEmail'));
+const ForgotPasswordPage = lazy(() => import('./pages/auth/ForgotPassword'));
+const ResetPasswordPage = lazy(() => import('./pages/auth/ResetPassword'));
+const AcceptInvitationPage = lazy(() => import('./pages/auth/AcceptInvitation'));
+const AccountPage = lazy(() => import('./pages/workspace/Account'));
 
 // workspace modules (lazy: chunky libs live here — recharts, qrcode)
 const Overview = lazy(() => import('./pages/workspace/Overview'));
@@ -70,6 +75,10 @@ export default function App({ session }: { session: SessionInfo | null }) {
         <Route path="/free-tools" element={<FreeToolsPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<OnboardingPage />} />
+        <Route path="/verify-email" element={<VerifyEmailPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
 
         {/* guarded workspace */}
         <Route path="/app" element={<RequireAuth session={session}><AppShell /></RequireAuth>}>
@@ -96,6 +105,7 @@ export default function App({ session }: { session: SessionInfo | null }) {
           <Route path="admin" element={guard('admin.org', <Admin />)} />
           <Route path="admin/audit" element={guard('admin.audit', <AuditTrail />)} />
           <Route path="notifications" element={<NotificationsPage />} />
+          <Route path="account" element={<AccountPage />} />
           <Route path="*" element={<Navigate to="/app/overview" replace />} />
         </Route>
 

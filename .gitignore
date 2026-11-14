@@ -9,3 +9,6 @@ dist-ssr
 coverage
 *.log
 .vercel
+
+# TypeScript incremental build info
+*.tsbuildinfo

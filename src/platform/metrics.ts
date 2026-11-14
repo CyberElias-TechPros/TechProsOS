@@ -15,7 +15,9 @@ export function visibleTickets(data: DataSet, ctx: AccessContext): Ticket[] {
   if (scope === 'all') return inTenant;
   if (scope === 'team') {
     // Technicians see the operational queue; employees only their own.
-    return inTenant.filter(t => t.assigneeId === ctx.userId || t.requesterId === ctx.userId || t.status === 'new' || t.status === 'triaged');
+    return inTenant.filter(t => t.assigneeId === ctx.userId || t.requesterId === ctx.userId ||
+      ((!t.assigneeId && (t.status === 'new' || t.status === 'triaged')) ||
+        (!!ctx.departmentId && t.departmentId === ctx.departmentId) || (!!ctx.branchId && t.branchId === ctx.branchId)));
   }
   if (scope === 'own') return inTenant.filter(t => t.requesterId === ctx.userId || t.assigneeId === ctx.userId);
   return [];
@@ -151,8 +153,8 @@ export function riskExposure(risks: { likelihood: number; impact: number }[]): n
 /** Work calendar from the tenant's default SLA policy. */
 export function workCalFor(data: DataSet, tenantId: string): WorkCal {
   const p = data.slaPolicies.find(x => x.tenantId === tenantId);
-  return p ? { workStartHour: p.workStartHour, workEndHour: p.workEndHour, workDays: p.workDays, holidays: p.holidays }
-    : { workStartHour: 8, workEndHour: 18, workDays: [1, 2, 3, 4, 5], holidays: [] };
+  return p ? { workStartHour: p.workStartHour, workEndHour: p.workEndHour, workDays: p.workDays, holidays: p.holidays, timezone: p.timezone }
+    : { workStartHour: 8, workEndHour: 18, workDays: [1, 2, 3, 4, 5], holidays: [], timezone: 'Africa/Lagos' };
 }
 
 /** Expense spend grouped by category, descending. */
@@ -160,4 +162,9 @@ export function spendByCategory(expenses: { category: string; amount: number }[]
   const m = new Map<string, number>();
   for (const e of expenses) m.set(e.category, (m.get(e.category) ?? 0) + e.amount);
   return [...m.entries()].map(([category, amount]) => ({ category, amount })).sort((a, b) => b.amount - a.amount);
+}
+
+/** Single source of project expenditure; milestones never manufacture spend. */
+export function projectSpend(data: Pick<DataSet, 'expenses'>, projectId: string): number {
+  return data.expenses.filter(e => e.projectId === projectId).reduce((sum, e) => sum + Math.round(e.amount * 100), 0) / 100;
 }

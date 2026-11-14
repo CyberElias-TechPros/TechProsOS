@@ -3,7 +3,8 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSessionCtx } from '../../platform/session';
 import { useData } from '../../platform/store';
-import { createProject, tenantUsers } from '../../platform/db';
+import { createProject } from '../../platform/actions';
+import { tenantUsers } from '../../platform/db';
 import { Badge, Modal, PageHead, StatusBadge, toast } from '../../components/ui';
 import { Icon } from '../../components/icons';
 import { DAYS, daysUntil, fmtDate, ngn, pct } from '../../platform/util';
@@ -73,8 +74,8 @@ function NewProjectModal({ open, onClose }: { open: boolean; onClose: () => void
   const clients = data.tenants.filter(t => t.providerId === ctx.tenantId);
   const [f, setF] = useState({ name: '', kind: 'Network deployment', managerId: '', budget: 1_500_000, weeks: 6, description: '', clientTenantId: '' });
 
-  const submit = () => {
-    createProject(ctx, {
+  const submit = async () => {
+    await createProject(ctx, {
       name: f.name.trim(), kind: f.kind, managerId: f.managerId || ctx.userId, budget: f.budget,
       dueAt: new Date(Date.now() + f.weeks * 7 * DAYS).toISOString(), description: f.description.trim(),
       clientTenantId: f.clientTenantId || undefined,

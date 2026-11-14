@@ -2,7 +2,8 @@
 import { useMemo, useState } from 'react';
 import { useSessionCtx } from '../../platform/session';
 import { useData } from '../../platform/store';
-import { runMaintenanceScheduler, tenantUsers, toggleChecklistItem, updateWorkOrderStatus } from '../../platform/db';
+import { runMaintenanceScheduler, toggleChecklistItem, updateWorkOrderStatus } from '../../platform/actions';
+import { tenantUsers } from '../../platform/db';
 import { Badge, Empty, PageHead, StatusBadge, Table, Tabs, toast, UserAvatar } from '../../components/ui';
 import { Icon } from '../../components/icons';
 import { DAYS, fmtDate, fmtTimeAgo } from '../../platform/util';
@@ -31,7 +32,7 @@ export default function Maintenance() {
       <PageHead crumbs={[tenant.name, 'Maintenance']} title="Maintenance & field service"
         sub={`${byStatus.open} open · ${byStatus.scheduled} scheduled · ${byStatus.in_progress} in progress · ${byStatus.completed} completed`}
         actions={can('maintenance.plan.manage') ? (
-          <button className="btn secondary" onClick={() => { const n = runMaintenanceScheduler(ctx); toast(n ? `${n} work order${n > 1 ? 's' : ''} generated from due plans` : 'No plans due right now', n ? 'ok' : 'info'); }}>
+          <button className="btn secondary" onClick={async () => { const n = await runMaintenanceScheduler(ctx); toast(n ? `${n} work order${n > 1 ? 's' : ''} generated from due plans` : 'No plans due right now', n ? 'ok' : 'info'); }}>
             <Icon name="refresh" size={14} /> Run plan scheduler
           </button>
         ) : undefined} />
@@ -65,7 +66,7 @@ export default function Maintenance() {
                       {w.checklist.map((c, i) => (
                         <label key={i} className="check-row" style={{ fontSize: 13 }}>
                           <input type="checkbox" checked={c.done} disabled={!can('maintenance.workorder.manage')}
-                            onChange={() => toggleChecklistItem(ctx, w.id, i)} />
+                            onChange={async () => await toggleChecklistItem(ctx, w.id, i)} />
                           <span style={c.done ? { textDecoration: 'line-through', color: 'var(--muted)' } : undefined}>{c.item}</span>
                         </label>
                       ))}
@@ -78,16 +79,16 @@ export default function Maintenance() {
                       {can('maintenance.workorder.manage') && w.status !== 'completed' && (
                         <div className="row">
                           <select className="select" style={{ maxWidth: 190 }} value={w.assigneeId ?? ''} aria-label="Assign work order"
-                            onChange={e => e.target.value && updateWorkOrderStatus(ctx, w.id, w.status, { assigneeId: e.target.value })}>
+                            onChange={async e => { if (e.target.value) await updateWorkOrderStatus(ctx, w.id, w.status, { assigneeId: e.target.value }); }}>
                             <option value="">Assign to…</option>
                             {staff.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                           </select>
-                          {w.status === 'open' && <button className="btn sm secondary" onClick={() => updateWorkOrderStatus(ctx, w.id, 'scheduled')}>Schedule</button>}
-                          {['open', 'scheduled'].includes(w.status) && <button className="btn sm secondary" onClick={() => updateWorkOrderStatus(ctx, w.id, 'in_progress')}>Start</button>}
-                          <button className="btn sm" onClick={() => {
+                          {w.status === 'open' && <button className="btn sm secondary" onClick={async () => await updateWorkOrderStatus(ctx, w.id, 'scheduled')}>Schedule</button>}
+                          {['open', 'scheduled'].includes(w.status) && <button className="btn sm secondary" onClick={async () => await updateWorkOrderStatus(ctx, w.id, 'in_progress')}>Start</button>}
+                          <button className="btn sm" onClick={async () => {
                             const done = w.checklist.filter(c => c.done).length;
                             if (done < w.checklist.length) { toast(`Finish the checklist first (${done}/${w.checklist.length})`, 'bad'); return; }
-                            updateWorkOrderStatus(ctx, w.id, 'completed');
+                            await updateWorkOrderStatus(ctx, w.id, 'completed');
                             toast(`${w.number} completed`);
                           }}>Complete</button>
                         </div>

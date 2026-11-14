@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useSessionCtx } from '../../platform/session';
 import { useData } from '../../platform/store';
-import { addTask, moveTask, setProjectStatus, toggleMilestone } from '../../platform/db';
+import { addTask, moveTask, setProjectStatus, toggleMilestone } from '../../platform/actions';
 import type { TaskColumn } from '../../platform/types';
 import { Badge as _Badge, Empty, KV, PageHead, StatusBadge, toast, UserAvatar } from '../../components/ui';
 import { Icon, type IconName } from '../../components/icons';
@@ -29,9 +29,9 @@ export default function ProjectDetail() {
   const client = project.clientTenantId ? data.tenants.find(t => t.id === project.clientTenantId) : undefined;
   const editable = can('projects.project.manage');
 
-  const add = () => {
+  const add = async () => {
     if (newTask.trim().length < 3) return;
-    addTask(ctx, project.id, newTask.trim(), 'backlog');
+    await addTask(ctx, project.id, newTask.trim(), 'backlog');
     setNewTask('');
   };
 
@@ -42,7 +42,7 @@ export default function ProjectDetail() {
         actions={
           editable ? (
             <select className="select" style={{ width: 150 }} value={project.status} aria-label="Project status"
-              onChange={e => { setProjectStatus(ctx, project.id, e.target.value as typeof project.status); toast(`Project ${e.target.value.replace(/_/g, ' ')}`); }}>
+              onChange={async e => { await setProjectStatus(ctx, project.id, e.target.value as typeof project.status); toast(`Project ${e.target.value.replace(/_/g, ' ')}`); }}>
               {(['planning', 'in_progress', 'on_hold', 'completed'] as const).map(s => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
             </select>
           ) : undefined
@@ -85,7 +85,7 @@ export default function ProjectDetail() {
                         <span className="row" style={{ gap: 2 }}>
                           {COLS.map(([c]) => c !== col && (
                             <button key={c} className="icon-btn" style={{ width: 22, height: 22 }} title={`Move to ${c}`}
-                              onClick={() => moveTask(ctx, t.id, c)}>
+                              onClick={async () => await moveTask(ctx, t.id, c)}>
                               <Icon name={COLS.findIndex(([x]) => x === c) < COLS.findIndex(([x]) => x === col) ? 'chevronL' as IconName : 'chevronR' as IconName} size={11} />
                             </button>
                           ))}
@@ -106,7 +106,7 @@ export default function ProjectDetail() {
             {project.milestones.map(m => (
               <div key={m.id} className="row between">
                 <label className="check-row" style={{ fontSize: 13.5 }}>
-                  <input type="checkbox" checked={m.done} disabled={!editable} onChange={() => toggleMilestone(ctx, project.id, m.id)} />
+                  <input type="checkbox" checked={m.done} disabled={!editable} onChange={async () => await toggleMilestone(ctx, project.id, m.id)} />
                   <span style={m.done ? { textDecoration: 'line-through', color: 'var(--muted)' } : undefined}>{m.title}</span>
                 </label>
                 <span className="xs faint">{fmtDate(m.dueAt)}</span>
