@@ -1,6 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter, useLocation } from 'react-router-dom';
 import App from './App';
 import './styles/base.css';
 import './styles/app.css';
@@ -9,16 +9,19 @@ import { SessionProvider } from './platform/session';
 import { ToastRegion, toast } from './components/ui';
 import { ApiError } from './platform/api';
 import { useLenis } from './app/motion';
+import { isPublicRoute } from './platform/routes';
 
 function Root() {
   useApplyTheme();
   useLenis();
   useBootstrap();
+  const { pathname } = useLocation();
   const status = useLiveAuth(s => s.status);
   const error = useLiveAuth(s => s.error);
   const info = useSessionInfo();
-  if (status === 'loading') return <div className="auth-wrap"><main className="auth-main"><div className="auth-card stack"><div className="skeleton" style={{ height: 28, width: '60%' }} /><div className="skeleton" style={{ height: 120 }} /><p className="muted sm">Connecting securely…</p></div></main></div>;
-  if (status === 'error') return <div className="auth-wrap"><main className="auth-main"><div className="auth-card stack"><h1 style={{ fontSize: 22 }}>Setup required</h1><p className="muted sm">{error}</p><button className="btn" onClick={() => void useLiveAuth.getState().bootstrap()}>Retry</button></div></main></div>;
+  const gate = !isPublicRoute(pathname);
+  if (gate && status === 'loading') return <div className="auth-wrap"><main className="auth-main"><div className="auth-card stack"><div className="skeleton" style={{ height: 28, width: '60%' }} /><div className="skeleton" style={{ height: 120 }} /><p className="muted sm">Connecting securely…</p></div></main></div>;
+  if (gate && status === 'error') return <div className="auth-wrap"><main className="auth-main"><div className="auth-card stack"><h1 style={{ fontSize: 22 }}>Service unavailable</h1><p className="muted sm">{error}</p><button className="btn" onClick={() => void useLiveAuth.getState().bootstrap()}>Retry</button><a className="btn secondary" href="/">Back to home</a></div></main></div>;
   return (
     <SessionProvider value={info}>
       <App session={info} />
