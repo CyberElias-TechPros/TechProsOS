@@ -25,6 +25,8 @@ export function SplitText({
   from = { y: 46, opacity: 0, rotateX: -40 }, ease = 'back.out(1.6)',
 }: Props) {
   const ref = useRef<HTMLSpanElement>(null);
+  const fromRef = useRef(from);
+  fromRef.current = from;
 
   useLayoutEffect(() => {
     const el = ref.current;
@@ -33,15 +35,19 @@ export function SplitText({
     el.setAttribute('aria-label', text);
     el.style.display = 'inline-block';
     el.style.perspective = '600px';
-    el.innerHTML = pieces
-      .map((p, i) => `<span aria-hidden="true" style="display:inline-block;will-change:transform,opacity;transform-origin:50% 100%">${p === ' ' ? '&nbsp;' : p}</span>${by === 'words' && i < pieces.length - 1 ? ' ' : ''}`)
-      .join('');
-    const targets = el.querySelectorAll('span[aria-hidden]');
-    gsap.fromTo(targets, from, {
-      y: 0, opacity: 1, rotateX: 0, duration: 0.7, ease, delay, stagger,
+    const parts: string[] = [];
+    const escaped = pieces.map(p => p === ' ' ? '&nbsp;' : p.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'));
+    for (const p of escaped) {
+      parts.push(`<span class="rb-split-clip" aria-hidden="true" style="display:inline-block;overflow:hidden;vertical-align:top"><span style="display:inline-block;will-change:transform,opacity;transform-origin:50% 100%">${p}</span></span>`);
+    }
+    el.innerHTML = parts.join(by === 'chars' ? '' : ' ');
+    const targets = el.querySelectorAll('.rb-split-clip > span');
+    gsap.fromTo(targets, fromRef.current, {
+      y: 0, yPercent: 0, opacity: 1, rotateX: 0, duration: 0.75, ease, delay, stagger,
       scrollTrigger: trigger === 'scroll' ? { trigger: el, start: 'top 88%', once: true } : undefined,
     });
     return () => { ScrollTrigger.getAll().forEach(t => { if (t.trigger === el) t.kill(); }); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [text, by, trigger, delay, stagger, ease]);
 
   return <span ref={ref} className={className}>{text}</span>;

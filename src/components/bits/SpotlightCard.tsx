@@ -100,8 +100,10 @@ export function ClickSpark({ children, sparkColor = '#5aa2ff', sparkCount = 8, s
     if (!wrap) return;
     const canvas = document.createElement('canvas');
     canvas.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:5';
+    let ctx: CanvasRenderingContext2D | null = null;
+    try { ctx = canvas.getContext('2d'); } catch { /* canvas unsupported */ }
+    if (!ctx) return;
     wrap.appendChild(canvas);
-    const ctx = canvas.getContext('2d')!;
     const sparks: { x: number; y: number; angle: number; start: number }[] = [];
     let raf = 0;
 
@@ -113,22 +115,23 @@ export function ClickSpark({ children, sparkColor = '#5aa2ff', sparkCount = 8, s
     };
     resize();
     const ro = new ResizeObserver(resize); ro.observe(wrap);
+    const c2d = ctx;
 
     const draw = (t: number) => {
-      ctx.clearRect(0, 0, wrap.offsetWidth, wrap.offsetHeight);
+      c2d.clearRect(0, 0, wrap.offsetWidth, wrap.offsetHeight);
       for (let i = sparks.length - 1; i >= 0; i--) {
         const s = sparks[i];
         const elapsed = t - s.start;
         if (elapsed > 420) { sparks.splice(i, 1); continue; }
         const d = (elapsed / 420) * sparkRadius;
         const alpha = 1 - elapsed / 420;
-        ctx.strokeStyle = sparkColor; ctx.globalAlpha = alpha; ctx.lineWidth = 2; ctx.lineCap = 'round';
-        ctx.beginPath();
-        ctx.moveTo(s.x + Math.cos(s.angle) * d, s.y + Math.sin(s.angle) * d);
-        ctx.lineTo(s.x + Math.cos(s.angle) * (d + 7), s.y + Math.sin(s.angle) * (d + 7));
-        ctx.stroke();
+        c2d.strokeStyle = sparkColor; c2d.globalAlpha = alpha; c2d.lineWidth = 2; c2d.lineCap = 'round';
+        c2d.beginPath();
+        c2d.moveTo(s.x + Math.cos(s.angle) * d, s.y + Math.sin(s.angle) * d);
+        c2d.lineTo(s.x + Math.cos(s.angle) * (d + 7), s.y + Math.sin(s.angle) * (d + 7));
+        c2d.stroke();
       }
-      if (sparks.length) raf = requestAnimationFrame(draw); else { ctx.clearRect(0, 0, wrap.offsetWidth, wrap.offsetHeight); raf = 0; }
+      if (sparks.length) raf = requestAnimationFrame(draw); else { c2d.clearRect(0, 0, wrap.offsetWidth, wrap.offsetHeight); raf = 0; }
     };
     const click = (e: MouseEvent) => {
       const r = wrap.getBoundingClientRect();

@@ -1,10 +1,11 @@
-/** Public landing — showpiece: Aurora hero, split-text headline, velocity marquee, spotlight cards. */
+/** Public landing — showpiece: Aurora hero, masked-line headline, velocity marquee, spotlight cards. */
+import { useLayoutEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { gsap } from 'gsap';
 import { Icon, type IconName } from '../../components/icons';
 import { MktNav, MktFooter } from './chrome';
 import { Aurora } from '../../components/bits/Aurora';
 import { BlurText, GradientText, ShinyText } from '../../components/bits/BlurText';
-import { SplitText } from '../../components/bits/SplitText';
 import { CountUp } from '../../components/bits/CountUp';
 import { ClickSpark, Magnet, SpotlightCard, StarBorder, Tilt } from '../../components/bits/SpotlightCard';
 import { ScrollVelocity } from '../../components/bits/ScrollVelocity';
@@ -55,22 +56,43 @@ function HeroCard() {
 
 export default function LandingPage() {
   const navigate = useNavigate();
+  const heroRef = useRef<HTMLElement>(null);
+
+  useLayoutEffect(() => {
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const el = heroRef.current;
+    if (!el) return;
+    const ctx = gsap.context(() => {
+      gsap.fromTo(el.querySelectorAll('.clip-inner'),
+        { yPercent: 112 },
+        { yPercent: 0, duration: 1.1, ease: 'expo.out', stagger: 0.13, delay: 0.2 });
+      gsap.fromTo(el.querySelector('.hero-mock'),
+        { opacity: 0, y: 34, rotateX: 6 },
+        { opacity: 1, y: 0, rotateX: 0, duration: 1.15, ease: 'expo.out', delay: 0.55, clearProps: 'opacity' });
+      gsap.fromTo(el.querySelectorAll('.hero-trust span'),
+        { opacity: 0, y: 10 },
+        { opacity: 1, y: 0, duration: 0.6, stagger: 0.08, delay: 1.05, ease: 'power2.out' });
+    }, el);
+    return () => ctx.revert();
+  }, []);
+
   return (
     <div className="mkt">
       <MktNav />
 
-      <section className="mkt-hero hero-v2">
-        <Aurora colors={['#0a1733', '#1d63ed', '#22d3ee']} intensity={0.8} speed={0.45} />
-        <div className="hero-grid-bg" aria-hidden />
+      <section className="mkt-hero hero-v2" ref={heroRef}>
+        <div className="hero-bg" aria-hidden>
+          <Aurora colors={['#0a1733', '#1d63ed', '#22d3ee']} intensity={0.8} speed={0.45} />
+          <div className="hero-grid-bg" />
+        </div>
         <div className="inner hero-split">
           <div>
-            <ShinyText text="IT OPERATIONS · SERVICE DELIVERY · NIGERIA-FIRST" className="mkt-eyebrow" shineDelay={4} style={{ color: '#7db3ff', letterSpacing: '.14em', fontWeight: 700, fontSize: 11.5 }} />
-            <h1 className="hero-h1">
-              <SplitText text="Your technology," by="chars" delay={0.15} />
-              <br />
-              <span className="hero-h1-blue">
-                <SplitText text="under control." by="chars" delay={0.55} />
-              </span>
+            <div className="hero-eyebrow clip-line"><span className="clip-inner">
+              <ShinyText text="IT OPERATIONS · SERVICE DELIVERY · NIGERIA-FIRST" shineDelay={4} />
+            </span></div>
+            <h1 className="hero-h1" aria-label="Your technology, under control.">
+              <span className="clip-line" aria-hidden="true"><span className="clip-inner">Your technology,</span></span>
+              <span className="clip-line" aria-hidden="true"><span className="clip-inner hero-grad">under control.</span></span>
             </h1>
             <BlurText
               className="lede"
