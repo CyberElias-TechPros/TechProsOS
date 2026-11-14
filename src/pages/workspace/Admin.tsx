@@ -164,19 +164,88 @@ function OrgProfile() {
   const { ctx, tenant } = useSessionCtx();
   const [name, setName] = useState(tenant.name);
   const [city, setCity] = useState(tenant.city);
-  const dirty = name !== tenant.name || city !== tenant.city;
+  const [f, setF] = useState({
+    legalName: tenant.legalName ?? '', tradingName: tenant.tradingName ?? '', rcNumber: tenant.rcNumber ?? '',
+    tin: tenant.tin ?? '', address: tenant.address ?? '', website: tenant.website ?? '',
+    supportEmail: tenant.supportEmail ?? '', accountsEmail: tenant.accountsEmail ?? '',
+    bank: tenant.bankDetails?.bank ?? '', accountName: tenant.bankDetails?.accountName ?? '',
+    accountNumber: tenant.bankDetails?.accountNumber ?? '',
+  });
+  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setF({ ...f, [k]: e.target.value });
+  const dirty = name !== tenant.name || city !== tenant.city
+    || f.legalName !== (tenant.legalName ?? '') || f.tradingName !== (tenant.tradingName ?? '')
+    || f.rcNumber !== (tenant.rcNumber ?? '') || f.tin !== (tenant.tin ?? '')
+    || f.address !== (tenant.address ?? '') || f.website !== (tenant.website ?? '')
+    || f.supportEmail !== (tenant.supportEmail ?? '') || f.accountsEmail !== (tenant.accountsEmail ?? '')
+    || f.bank !== (tenant.bankDetails?.bank ?? '') || f.accountName !== (tenant.bankDetails?.accountName ?? '')
+    || f.accountNumber !== (tenant.bankDetails?.accountNumber ?? '');
+  const save = async () => {
+    try {
+      const bankComplete = f.bank.trim() && f.accountName.trim() && f.accountNumber.trim();
+      if (f.accountNumber.trim() && !/^\d{10}$/.test(f.accountNumber.trim())) { toast('Account number must be a 10-digit NUBAN', 'bad'); return; }
+      if (bankComplete && (!f.bank.trim() || !f.accountName.trim())) { toast('Bank name and account name are both required', 'bad'); return; }
+      await updateTenantProfile(ctx, {
+        name: name.trim(), city,
+        legalName: f.legalName.trim(), tradingName: f.tradingName.trim(), rcNumber: f.rcNumber.trim(),
+        tin: f.tin.trim(), address: f.address.trim(), website: f.website.trim(),
+        supportEmail: f.supportEmail.trim(), accountsEmail: f.accountsEmail.trim(),
+        ...(bankComplete ? { bankDetails: { bank: f.bank.trim(), accountName: f.accountName.trim(), accountNumber: f.accountNumber.trim() } } : {}),
+      });
+      toast('Organisation profile updated');
+    } catch (e) { toast((e as Error).message, 'bad'); }
+  };
   return (
-    <div className="card pad-lg stack" style={{ maxWidth: 560 }}>
-      <h3>Organisation profile</h3>
-      <div className="field"><label>Legal name</label><input className="input" value={name} onChange={e => setName(e.target.value)} /></div>
-      <div className="field"><label>HQ city</label>
-        <select className="select" value={city} onChange={e => setCity(e.target.value)}>{['Lagos', 'Abuja', 'Port Harcourt', 'Ibadan', 'Kano'].map(c => <option key={c}>{c}</option>)}</select></div>
-      <button className="btn" disabled={!dirty} onClick={async () => { await updateTenantProfile(ctx, { name: name.trim(), city }); toast('Profile updated'); }}>Save profile</button>
-      <div className="kv" style={{ marginTop: 6 }}>
-        <dt className="xs muted">Workspace URL</dt><dd className="mono xs">{tenant.slug}.app.techpros.com.ng</dd>
-        <dt className="xs muted">Tenant type</dt><dd className="xs">{tenant.type === 'service_provider' ? 'Service provider' : 'Organisation'}</dd>
-        <dt className="xs muted">Created</dt><dd className="xs">{fmtTimeAgo(tenant.createdAt)}</dd>
+    <div className="stack" style={{ maxWidth: 640 }}>
+      <div className="card pad-lg stack">
+        <h3>Organisation profile</h3>
+        <div className="field"><label htmlFor="org-name">Display name</label><input id="org-name" className="input" value={name} onChange={e => setName(e.target.value)} /></div>
+        <div className="field"><label htmlFor="org-city">HQ city</label>
+          <select id="org-city" className="select" value={city} onChange={e => setCity(e.target.value)}>{['Lagos', 'Abuja', 'Port Harcourt', 'Ibadan', 'Kano'].map(c => <option key={c}>{c}</option>)}</select></div>
+        <div className="kv" style={{ marginTop: 6 }}>
+          <dt className="xs muted">Workspace</dt><dd className="mono xs">{tenant.slug}</dd>
+          <dt className="xs muted">Tenant type</dt><dd className="xs">{tenant.type === 'service_provider' ? 'Service provider' : 'Organisation'}</dd>
+          <dt className="xs muted">Created</dt><dd className="xs">{fmtTimeAgo(tenant.createdAt)}</dd>
+        </div>
       </div>
+
+      <div className="card pad-lg stack">
+        <h3>Invoice identity</h3>
+        <p className="sm muted">Printed on every invoice you issue. Leave a field empty to omit it — nothing is invented.</p>
+        <div className="form-grid">
+          <div className="field" style={{ gridColumn: '1 / -1' }}><label htmlFor="org-legal">Registered legal name</label>
+            <input id="org-legal" className="input" value={f.legalName} onChange={set('legalName')} placeholder="As it appears on your CAC certificate" /></div>
+          <div className="field"><label htmlFor="org-trading">Trading name</label>
+            <input id="org-trading" className="input" value={f.tradingName} onChange={set('tradingName')} placeholder="Customer-facing brand" /></div>
+          <div className="field"><label htmlFor="org-rc">RC number</label>
+            <input id="org-rc" className="input" inputMode="numeric" value={f.rcNumber} onChange={set('rcNumber')} /></div>
+          <div className="field"><label htmlFor="org-tin">TIN</label>
+            <input id="org-tin" className="input" inputMode="numeric" value={f.tin} onChange={set('tin')} /></div>
+          <div className="field"><label htmlFor="org-web">Website</label>
+            <input id="org-web" className="input" value={f.website} onChange={set('website')} placeholder="example.com.ng" /></div>
+          <div className="field" style={{ gridColumn: '1 / -1' }}><label htmlFor="org-addr">Business address</label>
+            <textarea id="org-addr" className="input" rows={2} value={f.address} onChange={set('address')} /></div>
+          <div className="field"><label htmlFor="org-support">Support email</label>
+            <input id="org-support" className="input" type="email" value={f.supportEmail} onChange={set('supportEmail')} /></div>
+          <div className="field"><label htmlFor="org-accounts">Accounts email</label>
+            <input id="org-accounts" className="input" type="email" value={f.accountsEmail} onChange={set('accountsEmail')} /></div>
+        </div>
+      </div>
+
+      <div className="card pad-lg stack">
+        <h3>Payment details</h3>
+        <p className="sm muted">Shown in the “Pay to” line on invoices. All three fields are required together.</p>
+        <div className="form-grid">
+          <div className="field"><label htmlFor="org-bank">Bank</label>
+            <input id="org-bank" className="input" value={f.bank} onChange={set('bank')} /></div>
+          <div className="field"><label htmlFor="org-acct">Account number (NUBAN)</label>
+            <input id="org-acct" className="input" inputMode="numeric" maxLength={10} value={f.accountNumber} onChange={set('accountNumber')} aria-describedby="org-acct-help" /></div>
+          <div className="field" style={{ gridColumn: '1 / -1' }}><label htmlFor="org-acctname">Account name</label>
+            <input id="org-acctname" className="input" value={f.accountName} onChange={set('accountName')} /></div>
+        </div>
+        <p id="org-acct-help" className="xs muted">Exactly 10 digits. Must match the account name your bank holds.</p>
+      </div>
+
+      <div><button className="btn" disabled={!dirty} onClick={() => void save()}>Save organisation settings</button></div>
     </div>
   );
 }
