@@ -3,8 +3,22 @@
 Everything you must provide before the merged production build can serve real customers.
 Verified against the code on `main` @ `9313b89` (not from memory).
 
-**Current state:** production is deployed and READY, but the Vercel project has **zero environment
-variables**, so every route renders the "Setup required" screen. Nothing below has been configured.
+**Current state (2026-11-14, after PR #3):** production is READY at `https://techpros.com.ng`
+and the public marketing site renders. Six production env vars are set. The database is not yet
+reachable (needs `DATABASE_CA_CERT`), migrations have not run, and sign-up is blocked until
+Resend is configured.
+
+| Variable | Status |
+|---|---|
+| `APP_MODE=live` | ✅ set |
+| `APP_URL=https://techpros.com.ng` | ✅ set (apex canonical; `www` 308-redirects here) |
+| `DATABASE_URL` | ✅ set (Aiven) |
+| `DATA_ENCRYPTION_KEY` | ✅ set (generated, 32 bytes) |
+| `CRON_SECRET` | ✅ set (generated, 64 hex chars) |
+| `DATABASE_POOL_MAX=2` | ✅ set (Aiven caps at 20 connections) |
+| `DATABASE_CA_CERT` | ❌ **needed — blocks all database access** |
+| `RESEND_API_KEY` / `EMAIL_FROM` | ❌ needed — blocks registration |
+| `PAYSTACK_SECRET_KEY` | ❌ needed — blocks payments |
 
 ---
 
@@ -138,12 +152,12 @@ I found these while auditing. They need implementation, not configuration:
 
 | # | Gap | Evidence | Impact |
 |---|---|---|---|
-| 1 | **Invoice bank details hardcoded** | `src/pages/workspace/Finance.tsx:172` | Every customer's invoice shows the wrong account. `tenant.bankDetails` exists in the schema but the print sheet ignores it. **Blocker for invoicing.** |
+| 1 | ~~Invoice bank details hardcoded~~ | **FIXED in PR #3** | Invoice reads `tenant.bankDetails` + legal identity; unset fields are omitted, never invented. Fill them in Admin → Organisation. |
 | 2 | **No Terms / Privacy routes** | no match in `src/App.tsx` | Consent checkbox links to nothing. **Legal blocker.** |
-| 3 | **Setup screen blocks marketing pages** | `src/main.tsx:21` | If config is ever incomplete, the public landing page disappears too. |
+| 3 | ~~Setup screen blocks marketing pages~~ | **FIXED in PR #3** | Gate now applies only to auth + workspace routes; marketing survives an unconfigured or unreachable backend. |
 | 4 | **No monitoring agent shipped** | only the ingest endpoint exists | "Monitoring" stays empty until a poller posts telemetry. |
 | 5 | **"Explore the live demo" → `/login`** | `src/pages/marketing/Landing.tsx:111` | In live mode that's a real login form, not a demo. |
-| 6 | **Workspace URL shows `*.app.techpros.com.ng`** | `src/pages/workspace/Admin.tsx:176` | Subdomain tenancy isn't implemented; the app is single-origin. Misleading label. |
+| 6 | ~~Workspace URL shows `*.app.techpros.com.ng`~~ | **FIXED in PR #3** | Now shows the plain workspace slug. |
 | 7 | **Assistant is deterministic analytics, not an LLM** | `src/platform/ai.ts` header | Works with **no API key**. If you want a real LLM, that's a new key + integration work. |
 
 Tell me which of these to fix and I'll do them on this branch.
@@ -194,8 +208,13 @@ curl -X POST https://<origin>/api/cron/run \
 Hand these back (secrets via Vercel/GitHub encrypted config, **never** in chat or git):
 
 ```
-Canonical origin (APP_URL) ......... https://____________________
-Postgres provider .................. ____________________
+Canonical origin (APP_URL) ......... https://techpros.com.ng          [DONE]
+Postgres provider .................. Aiven (pg-1054f5a4, defaultdb)   [DONE]
+Aiven CA certificate ............... [PASTE INTO VERCEL: DATABASE_CA_CERT]
+Resend sending domain .............. send.techpros.com.ng (recommended)
+Legal entity ....................... DELGRA LTD trading as TechPros
+RC number .......................... 9379032
+TIN ................................ 2623201957708
 DATABASE_URL ....................... [set directly in Vercel]
 DATA_ENCRYPTION_KEY ................ [openssl rand -base64 32 → Vercel]
 CRON_SECRET ........................ [openssl rand -hex 32 → Vercel]
