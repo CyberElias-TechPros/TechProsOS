@@ -10,7 +10,7 @@ export function configFromEnv(env: Record<string, string | undefined> = process.
   if (key && key.length !== 32) throw new Error('DATA_ENCRYPTION_KEY must be base64-encoded 32 random bytes');
   const appUrl = env.APP_URL ?? 'http://localhost:5173';
   const url = new URL(appUrl);
-  if (mode === 'live' && env.VERCEL && url.protocol !== 'https:') throw new Error('APP_URL must use HTTPS on Vercel');
+  if (mode === 'live' && env.VERCEL && env.APP_URL && url.protocol !== 'https:') throw new Error('APP_URL must use HTTPS on Vercel');
   if (env.CRON_SECRET && env.CRON_SECRET.length < 32) throw new Error('CRON_SECRET must contain at least 32 characters');
   return { mode, appUrl: url.origin, databaseUrl: env.DATABASE_URL, encryptionKey: key,
     emailKey: env.RESEND_API_KEY, emailFrom: env.EMAIL_FROM, paystackKey: env.PAYSTACK_SECRET_KEY,
