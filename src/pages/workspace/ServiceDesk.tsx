@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useSessionCtx } from '../../platform/session';
 import { useData } from '../../platform/store';
 import { visibleTickets, slaBadgeState } from '../../platform/metrics';
-import { assignTicket } from '../../platform/db';
+import { assignTicket } from '../../platform/actions';
 import { tenantUsers } from '../../platform/db';
 import type { Ticket } from '../../platform/types';
 import { Badge, Empty, PageHead, StatusBadge, Table, Tabs, toast } from '../../components/ui';
@@ -65,8 +65,8 @@ export default function ServiceDesk() {
   const categories = useMemo(() => [...new Set(scoped.map(x => x.category))].sort(), [scoped]);
   const branches = data.branches.filter(b => b.tenantId === ctx.tenantId);
 
-  const bulkAssign = (assigneeId: string) => {
-    selected.forEach(id => { try { assignTicket(ctx, id, assigneeId); } catch (e) { toast((e as Error).message, 'bad'); } });
+  const bulkAssign = async (assigneeId: string) => {
+    for (const id of selected) { try { await assignTicket(ctx, id, assigneeId); } catch (e) { toast((e as Error).message, 'bad'); } }
     setSelected([]);
     toast(`${selected.length} ticket${selected.length > 1 ? 's' : ''} assigned to ${userName(data, assigneeId)}`);
   };

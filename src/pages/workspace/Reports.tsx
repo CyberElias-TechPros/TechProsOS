@@ -4,7 +4,8 @@ import { Bar, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, T
 import { useSessionCtx } from '../../platform/session';
 import { useData } from '../../platform/store';
 import { itsmStats, slaCompliance, workCalFor, spendByCategory } from '../../platform/metrics';
-import { depreciatedValue, recordReportRun } from '../../platform/db';
+import { recordReportRun } from '../../platform/actions';
+import { depreciatedValue } from '../../platform/db';
 import { PageHead, Table, toast } from '../../components/ui';
 import { Icon, type IconName } from '../../components/icons';
 import { fmtDuration, fmtTimeAgo, ngn, pct } from '../../platform/util';
@@ -28,8 +29,8 @@ export default function Reports() {
   const stats = useMemo(() => itsmStats(tickets), [tickets]);
   const runs = data.reportRuns.filter(r => r.tenantId === ctx.tenantId);
 
-  const run = (r: ReportDef) => {
-    recordReportRun(ctx, r.id, r.title, { period: 'last-30d' });
+  const run = async (r: ReportDef) => {
+    await recordReportRun(ctx, r.id, r.title, { period: 'last-30d' });
     setRunning(r.id);
     toast(`“${r.title}” generated — use Print → Save as PDF`, 'info');
   };

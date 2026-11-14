@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSessionCtx } from '../../platform/session';
 import { useData } from '../../platform/store';
-import { createTicket } from '../../platform/db';
+import { createTicket } from '../../platform/actions';
 import { priorityFrom } from '../../platform/sla';
 import { suggestArticles } from '../../platform/ai';
 import { Badge, PageHead, StatusBadge, toast } from '../../components/ui';
@@ -36,8 +36,8 @@ export default function NewTicket() {
     [data, tenant.id, form.title, form.description],
   );
 
-  const submit = () => {
-    const id = createTicket(ctx, {
+  const submit = async () => {
+    const id = await createTicket(ctx, {
       kind: form.kind, title: form.title.trim(), description: form.description.trim(), category: form.category,
       impact: form.impact, urgency: form.urgency,
       branchId: form.branchId || undefined, assetId: form.assetId || undefined, source: 'portal',

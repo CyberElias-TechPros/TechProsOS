@@ -5,8 +5,7 @@
  * load so the demo always looks current; randomness is seeded (mulberry32)
  * so the shape of the data is stable.
  *
- * SLA calendars are stored in UTC hours: Lagos business hours
- * 08:00–18:00 WAT are 07:00–17:00 UTC.
+ * SLA calendars use Africa/Lagos local hours; deadlines are stored as UTC instants.
  */
 import type { DataSet, Ticket, TicketMessage, ImpactUrgency } from './types';
 import { addBusinessMinutes, DEFAULT_SLA_TARGETS, priorityFrom } from './sla';
@@ -77,7 +76,7 @@ export function buildSeed(): DataSet {
   ];
 
   const invitations: DataSet['invitations'] = [
-    { id: 'inv_1', tenantId: DEMO.greenfield, email: 'bisi.fashola@greenfield.edu.ng', name: 'Bisi Fashola', role: 'it_technician', status: 'pending', createdAt: iso(2 * DAYS) },
+    { id: 'inv_1', tenantId: DEMO.greenfield, email: 'bisi.fashola@greenfield.edu.ng', name: 'Bisi Fashola', role: 'it_technician', status: 'pending', createdAt: iso(2 * DAYS), expiresAt: isoAhead(5 * DAYS) },
   ];
 
   // ── Branches & departments ───────────────────────────────────────────────
@@ -101,7 +100,7 @@ export function buildSeed(): DataSet {
   ];
 
   // ── SLA policies (hours stored in UTC) ───────────────────────────────────
-  const cal = { workStartHour: 7, workEndHour: 17, workDays: [1, 2, 3, 4, 5, 6], holidays: ['2026-12-25', '2026-12-26', '2027-01-01'] };
+  const cal = { workStartHour: 8, workEndHour: 18, workDays: [1, 2, 3, 4, 5, 6], holidays: ['2026-12-25', '2026-12-26', '2027-01-01'], timezone: 'Africa/Lagos' };
   const slaPolicies: DataSet['slaPolicies'] = [
     { id: 'sla_gf', tenantId: DEMO.greenfield, name: 'Greenfield standard SLA', targets: DEFAULT_SLA_TARGETS, ...cal },
     { id: 'sla_tp', tenantId: DEMO.techpros, name: 'Managed client SLA', targets: DEFAULT_SLA_TARGETS, ...cal },
@@ -534,6 +533,15 @@ export function buildSeed(): DataSet {
     devices, alerts, projects, tasks, agreements, contacts,
     vendors, purchaseOrders, stockItems, invoices, expenses, budgets,
     articles, documents, assessments, findings, risks,
-    auditLogs, notifications, reportRuns, counters,
+    auditLogs, notifications, reportRuns,
+    delegations: [DEMO.stives, DEMO.northgate, DEMO.lumen].flatMap(clientTenantId =>
+      [DEMO_USERS.adaeze, DEMO_USERS.yusuf, DEMO_USERS.segun].map(userId => ({
+        id: `grant_${clientTenantId}_${userId}`, tenantId: clientTenantId, providerId: DEMO.techpros, userId,
+        permissions: (userId === DEMO_USERS.adaeze ? ['itsm.ticket.view.all', 'itsm.ticket.assign', 'itsm.ticket.update', 'itsm.ticket.close', 'assets.asset.view', 'assets.asset.update', 'maintenance.workorder.view', 'maintenance.workorder.manage', 'infrastructure.device.view', 'infrastructure.alert.manage', 'projects.project.view', 'docs.content.view', 'reports.report.view']
+          : userId === DEMO_USERS.yusuf ? ['itsm.ticket.view.team', 'itsm.ticket.update', 'assets.asset.view', 'maintenance.workorder.view', 'maintenance.workorder.manage', 'infrastructure.device.view', 'docs.content.view']
+          : ['itsm.ticket.view.all', 'projects.project.view', 'reports.report.view', 'docs.content.view']) as import('./permissions').Permission[],
+        expiresAt: isoAhead(90 * DAYS), status: 'active' as const, createdBy: DEMO_USERS.adaeze, createdAt: iso(30 * DAYS),
+      }))),
+    reportSchedules: [], privacyRequests: [], attachments: [], counters,
   };
 }

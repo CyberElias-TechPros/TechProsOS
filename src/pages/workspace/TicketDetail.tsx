@@ -4,7 +4,8 @@ import { Link, useParams } from 'react-router-dom';
 import { useSessionCtx } from '../../platform/session';
 import { useData } from '../../platform/store';
 import { visibleTickets, slaBadgeState } from '../../platform/metrics';
-import { addTicketMessage, assignTicket, rateTicket, setTicketStatus, tenantUsers } from '../../platform/db';
+import { addTicketMessage, assignTicket, rateTicket, setTicketStatus } from '../../platform/actions';
+import { tenantUsers } from '../../platform/db';
 import type { TicketStatus } from '../../platform/types';
 import { Badge, KV, PageHead, StatusBadge, toast, UserAvatar, Empty } from '../../components/ui';
 import { Icon } from '../../components/icons';
@@ -44,13 +45,13 @@ export default function TicketDetail() {
   const sla = slaBadgeState(ticket);
   const isOpen = !['closed'].includes(ticket.status);
 
-  const doStatus = (status: TicketStatus) => {
-    try { setTicketStatus(ctx, ticket.id, status); toast(`Marked ${status.replace(/_/g, ' ')}`); }
+  const doStatus = async (status: TicketStatus) => {
+    try { await setTicketStatus(ctx, ticket.id, status); toast(`Marked ${status.replace(/_/g, ' ')}`); }
     catch (e) { toast((e as Error).message, 'bad'); }
   };
-  const send = () => {
+  const send = async () => {
     if (!draft.trim()) return;
-    addTicketMessage(ctx, ticket.id, draft.trim(), internal && can('itsm.ticket.update'));
+    await addTicketMessage(ctx, ticket.id, draft.trim(), internal && can('itsm.ticket.update'));
     setDraft('');
   };
 
@@ -63,7 +64,7 @@ export default function TicketDetail() {
           <div className="row">
             {can('itsm.ticket.assign') && (
               <select className="select" style={{ width: 170 }} value={ticket.assigneeId ?? ''} aria-label="Assign to"
-                onChange={e => { if (e.target.value) { assignTicket(ctx, ticket.id, e.target.value); toast(`Assigned to ${userName(data, e.target.value)}`); } }}>
+                onChange={async e => { if (e.target.value) { await assignTicket(ctx, ticket.id, e.target.value); toast(`Assigned to ${userName(data, e.target.value)}`); } }}>
                 <option value="">Unassigned</option>
                 {staff.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
               </select>
@@ -129,7 +130,7 @@ export default function TicketDetail() {
               <p className="muted sm">Rate this resolution — it feeds the CSAT score on your reports.</p>
               <div className="row">
                 {[1, 2, 3, 4, 5].map(n => (
-                  <button key={n} className="btn secondary" onClick={() => { rateTicket(ctx, ticket.id, n); toast('Thanks for the feedback'); }}>
+                  <button key={n} className="btn secondary" onClick={async () => { await rateTicket(ctx, ticket.id, n); toast('Thanks for the feedback'); }}>
                     {n} ★
                   </button>
                 ))}

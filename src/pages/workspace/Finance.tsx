@@ -2,7 +2,10 @@
 import { useState } from 'react';
 import { useSessionCtx } from '../../platform/session';
 import { useData } from '../../platform/store';
-import { createExpense, createInvoice, depreciatedValue, setInvoiceStatus, invoiceTotals } from '../../platform/db';
+import { createExpense, createInvoice, setInvoiceStatus, recordPayment } from '../../platform/actions';
+import { depreciatedValue, invoiceTotals } from '../../platform/db';
+import { invoiceBalanceKobo } from '../../platform/money';
+import { api } from '../../platform/api';
 import { invoiceNet } from '../../platform/metrics';
 import { Badge, Empty, KV, Modal, PageHead, StatusBadge, Table, Tabs, toast, Bar } from '../../components/ui';
 import { Icon } from '../../components/icons';
@@ -14,6 +17,7 @@ export default function Finance() {
   const data = useData(s => s.data);
   const [tab, setTab] = useState('invoices');
   const [modal, setModal] = useState<'invoice' | 'expense' | null>(null);
+  const [payInvoice, setPayInvoice] = useState<string | null>(null);
   const [showInvoice, setShowInvoice] = useState<string | null>(null);
 
   const invoices = data.invoices.filter(i => i.tenantId === ctx.tenantId);
@@ -61,8 +65,14 @@ export default function Finance() {
                 <td className="num">{ngn(invoiceNet(i))}</td>
                 <td><StatusBadge s={i.status} /></td>
                 <td className="no-print">
-                  {can('finance.invoice.manage') && i.status !== 'paid' && (
-                    <button className="btn sm secondary" onClick={e => { e.stopPropagation(); setInvoiceStatus(ctx, i.id, 'paid'); toast(`${i.number} marked paid`); }}>Mark paid</button>
+                  {can('finance.invoice.manage') && i.status === 'draft' && (
+                    <button className="btn sm secondary" onClick={async e => { e.stopPropagation(); try { await setInvoiceStatus(ctx, i.id, 'sent'); toast(`${i.number} sent`); } catch (err) { toast((err as Error).message, 'bad'); } }}>Send</button>
+                  )}
+                  {can('finance.invoice.manage') && ['sent', 'partial', 'overdue'].includes(i.status) && (
+                    <div className="row" onClick={e => e.stopPropagation()}>
+                      <button className="btn sm secondary" onClick={() => setPayInvoice(i.id)}>Record payment</button>
+                      <button className="btn sm ghost" onClick={async () => { try { const { url } = await api.invoiceCheckout(i.id); window.location.assign(url); } catch (err) { toast((err as Error).message, 'bad'); } }}>Pay online</button>
+                    </div>
                   )}
                 </td>
               </tr>
@@ -107,6 +117,7 @@ export default function Finance() {
 
       {modal === 'invoice' && <InvoiceModal onClose={() => setModal(null)} />}
       {modal === 'expense' && <ExpenseModal onClose={() => setModal(null)} />}
+      {payInvoice && <PaymentModal invoiceId={payInvoice} onClose={() => setPayInvoice(null)} />}
       {printed && <InvoiceSheet invoice={printed} onClose={() => setShowInvoice(null)} />}
     </div>
   );
@@ -171,9 +182,9 @@ function InvoiceModal({ onClose }: { onClose: () => void }) {
   const clients = data.tenants.filter(t => t.providerId === ctx.tenantId);
   const [f, setF] = useState({ client: '', desc: '', qty: 1, unitPrice: 500000, whtRate: 0.05, dueDays: 14 });
   const tot = invoiceTotals([{ desc: f.desc || 'Service', qty: f.qty, unitPrice: f.unitPrice }], 0.075, f.whtRate);
-  const submit = () => {
+  const submit = async () => {
     const clientTenantId = clients.find(c => c.name === f.client)?.id;
-    createInvoice(ctx, { clientName: f.client.trim(), clientTenantId, items: [{ desc: f.desc.trim(), qty: f.qty, unitPrice: f.unitPrice }], whtRate: f.whtRate, dueDays: f.dueDays });
+    await createInvoice(ctx, { clientName: f.client.trim(), clientTenantId, items: [{ desc: f.desc.trim(), qty: f.qty, unitPrice: f.unitPrice }], whtRate: f.whtRate, dueDays: f.dueDays });
     toast('Invoice issued');
     onClose();
   };
@@ -226,9 +237,36 @@ function ExpenseModal({ onClose }: { onClose: () => void }) {
         <div className="field"><label>Amount (₦)</label><input className="input" type="number" value={f.amount} onChange={e => setF({ ...f, amount: +e.target.value })} /></div>
       </div>
       <button className="btn block" disabled={f.title.trim().length < 4 || f.amount <= 0}
-        onClick={() => { createExpense(ctx, { title: f.title.trim(), category: f.category, amount: f.amount, branchId: f.branchId || undefined }); toast('Expense recorded'); onClose(); }}>
+        onClick={async () => { await createExpense(ctx, { title: f.title.trim(), category: f.category, amount: f.amount, branchId: f.branchId || undefined }); toast('Expense recorded'); onClose(); }}>
         Record expense
       </button>
+    </Modal>
+  );
+}
+
+function PaymentModal({ invoiceId, onClose }: { invoiceId: string; onClose: () => void }) {
+  const { ctx } = useSessionCtx();
+  const data = useData(s => s.data);
+  const invoice = data.invoices.find(i => i.id === invoiceId);
+  const balance = invoice ? invoiceBalanceKobo(invoice) / 100 : 0;
+  const [f, setF] = useState({ amount: balance, method: 'bank_transfer' as 'bank_transfer' | 'cash' | 'withholding_credit', reference: '' });
+  const [busy, setBusy] = useState(false);
+  if (!invoice) return null;
+  const submit = async () => {
+    setBusy(true);
+    try { await recordPayment(ctx, invoice.id, f.amount, f.method, f.reference.trim()); toast('Payment recorded'); onClose(); }
+    catch (e) { toast((e as Error).message, 'bad'); }
+    finally { setBusy(false); }
+  };
+  return (
+    <Modal open onClose={onClose} title={`Record payment · ${invoice.number}`}>
+      <div className="form-grid">
+        <div className="field"><label htmlFor="pay-amount">Amount (₦)</label><input id="pay-amount" className="input" type="number" min="0.01" step="0.01" max={balance} value={f.amount} onChange={e => setF({ ...f, amount: +e.target.value })} /></div>
+        <div className="field"><label htmlFor="pay-method">Method</label><select id="pay-method" className="select" value={f.method} onChange={e => setF({ ...f, method: e.target.value as typeof f.method })}><option value="bank_transfer">Bank transfer</option><option value="cash">Cash</option><option value="withholding_credit">WHT credit note</option></select></div>
+        <div className="field" style={{ gridColumn: '1 / -1' }}><label htmlFor="pay-ref">Reference / credit note</label><input id="pay-ref" className="input" value={f.reference} onChange={e => setF({ ...f, reference: e.target.value })} placeholder="Bank receipt or FIRS credit note reference" /></div>
+      </div>
+      <p className="hint">Outstanding balance: {ngn(balance)}. Partial payments are supported; paid status is derived from the ledger.</p>
+      <button className="btn block" disabled={busy || f.amount <= 0 || f.amount > balance || !f.reference.trim()} onClick={submit}>{busy ? 'Recording…' : 'Record payment'}</button>
     </Modal>
   );
 }

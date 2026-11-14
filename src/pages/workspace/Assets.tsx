@@ -3,7 +3,8 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSessionCtx } from '../../platform/session';
 import { useData } from '../../platform/store';
-import { createAsset, depreciatedValue } from '../../platform/db';
+import { createAsset } from '../../platform/actions';
+import { depreciatedValue } from '../../platform/db';
 import type { AssetLifecycle } from '../../platform/types';
 import { Badge, Empty, Modal, PageHead, StatusBadge, Table, toast } from '../../components/ui';
 import { Icon } from '../../components/icons';
@@ -119,8 +120,8 @@ export function AssetForm({ open, onClose }: { open: boolean; onClose: () => voi
   const data = useData(s => s.data);
   const branches = data.branches.filter(b => b.tenantId === ctx.tenantId);
   const [f, setF] = useState({ name: '', category: 'End-user computing', manufacturer: '', model: '', serial: '', branchId: '', cost: 750000, years: 4 });
-  const submit = () => {
-    const id = createAsset(ctx, {
+  const submit = async () => {
+    const id = await createAsset(ctx, {
       name: f.name.trim(), category: f.category, manufacturer: f.manufacturer.trim(), model: f.model.trim(), serial: f.serial.trim(),
       branchId: f.branchId || branches[0]?.id || '', purchaseDate: new Date().toISOString(),
       purchaseCost: f.cost, usefulLifeYears: f.years,

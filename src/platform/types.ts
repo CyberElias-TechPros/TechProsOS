@@ -22,6 +22,12 @@ export interface Tenant {
   city: string;
   createdAt: string;
   aiAssistCredits: number;
+  trialEndsAt?: string;
+  subscriptionStatus?: 'trialing' | 'active' | 'past_due' | 'cancelled';
+  subscriptionExpiresAt?: string;
+  billingEmail?: string;
+  bankDetails?: { bank: string; accountName: string; accountNumber: string };
+  notificationEmails?: boolean;
 }
 
 export interface User {
@@ -32,6 +38,8 @@ export interface User {
   title: string;
   status: 'active' | 'invited' | 'deactivated';
   createdAt: string;
+  emailVerified?: boolean;
+  mfaEnabled?: boolean;
 }
 
 export type RoleId =
@@ -57,6 +65,7 @@ export interface Invitation {
   role: RoleId;
   status: 'pending' | 'accepted' | 'revoked';
   createdAt: string;
+  expiresAt: string;
 }
 
 // ── Organisation structure ────────────────────────────────────────────────────
@@ -98,6 +107,14 @@ export interface Ticket {
   source: 'portal' | 'email' | 'monitoring' | 'phone' | 'walkin';
   createdAt: string;
   updatedAt: string;
+  pausedAt?: string;
+  pausedMs?: number;
+  pendingReason?: string;
+  changePlan?: string;
+  rollbackPlan?: string;
+  scheduledAt?: string;
+  approvedBy?: string;
+  resolutionArticleId?: string;
 }
 
 export interface TicketMessage {
@@ -119,7 +136,8 @@ export interface SlaPolicy {
   workStartHour: number; // e.g. 8
   workEndHour: number;   // e.g. 18
   workDays: number[];    // 1-5 Mon..Fri
-  holidays: string[];    // ISO dates
+  holidays: string[];    // ISO dates in the policy timezone
+  timezone: string;      // IANA zone; WAT is Africa/Lagos (UTC+1, no DST)
 }
 
 // ── Assets ────────────────────────────────────────────────────────────────────
@@ -288,20 +306,26 @@ export interface PurchaseOrder {
   number: string;
   vendorId: ID;
   status: POStatus;
-  items: { name: string; qty: number; unitCost: number }[];
+  items: { name: string; qty: number; unitCost: number; kind?: 'capital' | 'consumable' }[];
   requestedBy: ID;
   approvedBy?: ID;
   branchId?: ID;
   note?: string;
   createdAt: string;
   receivedAt?: string;
+  receivedBy?: ID;
+  receivedBranchId?: ID;
 }
 export interface StockItem {
   id: ID; tenantId: ID; name: string; sku: string; category: string; qty: number; reorderLevel: number; unitCost: number; branchId: ID;
 }
 
 // ── Finance (operational, not full accounting) ────────────────────────────────
-export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue';
+export type InvoiceStatus = 'draft' | 'sent' | 'partial' | 'paid' | 'overdue' | 'cancelled';
+export interface PaymentRecord {
+  id: ID; amount: number; method: 'bank_transfer' | 'cash' | 'paystack' | 'withholding_credit';
+  reference: string; recordedBy: ID; at: string; creditNoteRef?: string;
+}
 export interface InvoiceItem { desc: string; qty: number; unitPrice: number; }
 export interface Invoice {
   id: ID; tenantId: ID; number: string; clientName: string; clientTenantId?: ID;
@@ -310,6 +334,9 @@ export interface Invoice {
   whtRate: number;  // 0 / 0.05 / 0.10 — shown as deduction note
   issuedAt: string; dueAt: string; paidAt?: string;
   createdBy: ID;
+  payments?: PaymentRecord[];
+  notes?: string;
+  checkoutReference?: string;
 }
 export interface Expense {
   id: ID; tenantId: ID; title: string; category: string; amount: number;
@@ -327,6 +354,7 @@ export interface KnowledgeArticle {
 export interface DocumentRecord {
   id: ID; tenantId: ID; title: string; kind: 'policy' | 'sop' | 'diagram' | 'manual' | 'report' | 'handover';
   version: string; ownerId: ID; summary: string; assetId?: ID; expiresAt?: string; updatedAt: string;
+  versions?: { version: string; summary: string; at: string; by: ID }[];
 }
 
 // ── Compliance ────────────────────────────────────────────────────────────────
@@ -341,6 +369,7 @@ export interface Assessment {
   /** percent 0-100 of controls satisfied — self-assessment indicator, never a certification */
   score: number;
   conductedBy: ID; startedAt: string; completedAt?: string;
+  controls?: { id: ID; title: string; response: 'yes' | 'no' | 'na'; evidence: string }[];
 }
 export type RiskStatus = 'open' | 'mitigating' | 'accepted' | 'closed';
 export interface Risk {
@@ -365,6 +394,25 @@ export interface NotificationItem {
 }
 export interface ReportRun {
   id: ID; tenantId: ID; reportId: string; title: string; runBy: ID; at: string; params: Record<string, string>;
+}
+
+// ── Explicit, expiring provider access and platform operations ────────────────
+export interface Delegation {
+  id: ID; tenantId: ID; providerId: ID; userId: ID;
+  permissions: import('./permissions').Permission[];
+  expiresAt: string; status: 'active' | 'revoked'; createdBy: ID; createdAt: string;
+}
+export interface ReportSchedule {
+  id: ID; tenantId: ID; reportId: string; name: string;
+  cadence: 'daily' | 'weekly' | 'monthly'; recipients: string[];
+  nextRunAt: string; active: boolean; branchId?: ID; createdBy: ID;
+}
+export interface PrivacyRequest {
+  id: ID; tenantId: ID; userId: ID; kind: 'export' | 'erasure';
+  status: 'pending' | 'completed' | 'rejected'; reason: string; createdAt: string; resolvedAt?: string;
+}
+export interface AttachmentMeta {
+  id: ID; tenantId: ID; entityId: ID; name: string; mime: string; size: number; createdBy: ID; createdAt: string;
 }
 
 // ── Store shape ──────────────────────────────────────────────────────────────
@@ -401,5 +449,9 @@ export interface DataSet {
   auditLogs: AuditLog[];
   notifications: NotificationItem[];
   reportRuns: ReportRun[];
+  delegations: Delegation[];
+  reportSchedules: ReportSchedule[];
+  privacyRequests: PrivacyRequest[];
+  attachments: AttachmentMeta[];
   counters: Record<string, number>; // per-tenant numbering sequences, key `${tenantId}:${kind}`
 }

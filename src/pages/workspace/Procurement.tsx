@@ -2,7 +2,8 @@
 import { useState } from 'react';
 import { useSessionCtx } from '../../platform/session';
 import { useData } from '../../platform/store';
-import { createPurchaseOrder, createVendor, setPoStatus, tenantUsers } from '../../platform/db';
+import { createPurchaseOrder, createVendor, setPoStatus } from '../../platform/actions';
+import { tenantUsers } from '../../platform/db';
 import { Badge, Empty, Modal, PageHead, StatusBadge, Table, Tabs, toast } from '../../components/ui';
 import { Icon } from '../../components/icons';
 import { fmtDate, ngn } from '../../platform/util';
@@ -64,7 +65,7 @@ export default function Procurement() {
                   <td className="sm">{userName(data, po.requestedBy)}</td>
                   <td>
                     {mayAdvance && (
-                      <button className="btn sm secondary" onClick={() => { setPoStatus(ctx, po.id, next!); toast(`${po.number} → ${next}`); }}>
+                      <button className="btn sm secondary" onClick={async () => { await setPoStatus(ctx, po.id, next!); toast(`${po.number} → ${next}`); }}>
                         {po.status === 'requested' ? 'Approve' : po.status === 'approved' ? 'Mark ordered' : 'Mark received'}
                       </button>
                     )}
@@ -127,8 +128,8 @@ function PoModal({ onClose }: { onClose: () => void }) {
   const data = useData(s => s.data);
   const vendors = data.vendors.filter(v => v.tenantId === ctx.tenantId);
   const [f, setF] = useState({ vendorId: vendors[0]?.id ?? '', name: '', qty: 1, unitCost: 250_000 });
-  const submit = () => {
-    createPurchaseOrder(ctx, { vendorId: f.vendorId, items: [{ name: f.name.trim(), qty: f.qty, unitCost: f.unitCost }] });
+  const submit = async () => {
+    await createPurchaseOrder(ctx, { vendorId: f.vendorId, items: [{ name: f.name.trim(), qty: f.qty, unitCost: f.unitCost }] });
     toast('Purchase order requested — routing to approver');
     onClose();
   };
@@ -155,8 +156,8 @@ function PoModal({ onClose }: { onClose: () => void }) {
 function VendorModal({ onClose }: { onClose: () => void }) {
   const { ctx } = useSessionCtx();
   const [f, setF] = useState({ name: '', category: 'Hardware', contact: '', email: '', phone: '' });
-  const submit = () => {
-    createVendor(ctx, { name: f.name.trim(), category: f.category, contact: f.contact.trim(), email: f.email.trim(), phone: f.phone.trim() });
+  const submit = async () => {
+    await createVendor(ctx, { name: f.name.trim(), category: f.category, contact: f.contact.trim(), email: f.email.trim(), phone: f.phone.trim() });
     toast('Vendor registered');
     onClose();
   };

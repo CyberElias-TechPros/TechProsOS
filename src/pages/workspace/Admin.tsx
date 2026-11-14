@@ -2,14 +2,16 @@
 import { useMemo, useState } from 'react';
 import { useSessionCtx } from '../../platform/session';
 import { useData } from '../../platform/store';
-import { acceptInvitation, changeMemberRole, createBranch, createDepartment, inviteUser, setSubscriptionPlan, tenantUsers, updateTenantProfile } from '../../platform/db';
+import { changeMemberRole, createBranch, createDepartment, inviteUser, setSubscriptionPlan, updateTenantProfile, deactivateUser, revokeInvitation } from '../../platform/actions';
+import { SlaPanel, PrivacyPanel, SchedulesPanel, DelegationsPanel, IntegrationsPanel } from './AdminPanels';
+import { PLANS, SELF_SERVE_PLANS } from '../../platform/plans';
+import { tenantUsers } from '../../platform/db';
 import { ROLE_LABELS, permissionsForRole } from '../../platform/permissions';
 import type { RoleId } from '../../platform/types';
 import { Badge, Modal, PageHead, StatusBadge, Table, Tabs, toast, UserAvatar } from '../../components/ui';
 import { Icon } from '../../components/icons';
 import { fmtTimeAgo, ngn } from '../../platform/util';
 
-const PLAN_PRICE: Record<string, number> = { starter: 19500, professional: 59500, business: 149500, enterprise: 0 };
 const USER_ROLES: RoleId[] = ['org_admin', 'it_manager', 'it_technician', 'network_engineer', 'security_officer', 'procurement_officer', 'finance_officer', 'dept_manager', 'employee', 'auditor'];
 
 export default function Admin() {
@@ -40,6 +42,10 @@ export default function Admin() {
           ['users', `Users (${seats})`],
           ['structure', `Branches & departments`],
           ['org', 'Organisation'],
+          ...(can('admin.org') ? [['sla', 'SLA & hours'], ['privacy', 'Privacy']] : []),
+          ...(can('reports.report.export') ? [['schedules', 'Report schedules']] : []),
+          ...(tenant.type === 'service_provider' && can('clients.client.manage') ? [['delegations', 'Client access']] : []),
+          ...(can('admin.integrations') ? [['integrations', 'Integrations']] : []),
           ...(can('admin.subscription') ? [['plan', 'Plan & billing']] : []),
         ] as [string, string][]} value={tab} onChange={setTab} />
       </div>
@@ -57,14 +63,14 @@ export default function Admin() {
               <td>
                 {isAdmin && u.id !== user.id ? (
                   <select className="select sm" style={{ width: 170 }} value={roleOf(u.id)} aria-label="Role"
-                    onChange={e => { try { changeMemberRole(ctx, u.id, e.target.value as RoleId); toast(`${u.name.split(' ')[0]} is now ${ROLE_LABELS[e.target.value as RoleId]}`); } catch (err) { toast((err as Error).message, 'bad'); } }}>
+                    onChange={async e => { try { await changeMemberRole(ctx, u.id, e.target.value as RoleId); toast(`${u.name.split(' ')[0]} is now ${ROLE_LABELS[e.target.value as RoleId]}`); } catch (err) { toast((err as Error).message, 'bad'); } }}>
                     {(ctx.role === 'org_owner' ? ([...USER_ROLES, 'org_owner'] as RoleId[]) : USER_ROLES).map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
                   </select>
                 ) : <Badge tone="accent">{ROLE_LABELS[roleOf(u.id)]}</Badge>}
               </td>
               <td className="xs muted">{permissionsForRole(roleOf(u.id)).size} permissions</td>
               <td><StatusBadge s={u.status} /></td>
-              <td className="xs faint">{fmtTimeAgo(u.createdAt)}</td>
+              <td className="xs faint">{fmtTimeAgo(u.createdAt)}{isAdmin && u.id !== user.id && roleOf(u.id) !== 'org_owner' && <button className="btn ghost sm" style={{ marginLeft: 8 }} onClick={async () => { if (!window.confirm(`Revoke workspace access for ${u.name}?`)) return; try { await deactivateUser(ctx, u.id); toast('Access revoked'); } catch (e) { toast((e as Error).message, 'bad'); } }}>Deactivate</button>}</td>
             </tr>
           ))}
         </Table>
@@ -76,7 +82,7 @@ export default function Admin() {
           {invitations.map(i => (
             <div key={i.id} className="row between card flat card-tight">
               <span><b className="sm">{i.name}</b> <span className="xs muted">· {i.email} · invited as {ROLE_LABELS[i.role]}</span></span>
-              {isAdmin && <button className="btn sm secondary" onClick={() => { if (acceptInvitation(ctx, i.id)) toast(`${i.name} onboarded`); }}>Activate (demo)</button>}
+              <span className="row"><span className="xs muted">Awaiting recipient acceptance</span>{isAdmin && <button className="btn ghost sm" onClick={async () => { try { await revokeInvitation(ctx, i.id); toast('Invitation revoked'); } catch (e) { toast((e as Error).message, 'bad'); } }}>Revoke</button>}</span>
             </div>
           ))}
         </div>
@@ -95,7 +101,7 @@ export default function Admin() {
             {isAdmin && (
               <div className="row">
                 <input className="input" placeholder="New branch name…" value={branchName} onChange={e => setBranchNL(e.target.value)} aria-label="Branch name" />
-                <button className="btn sm" disabled={branchName.trim().length < 3} onClick={() => { createBranch(ctx, branchName.trim(), tenant.city); setBranchNL(''); toast('Branch added'); }}>Add</button>
+                <button className="btn sm" disabled={branchName.trim().length < 3} onClick={async () => { await createBranch(ctx, branchName.trim(), tenant.city); setBranchNL(''); toast('Branch added'); }}>Add</button>
               </div>
             )}
           </div>
@@ -104,6 +110,11 @@ export default function Admin() {
       )}
 
       {tab === 'org' && <OrgProfile />}
+      {tab === 'sla' && <SlaPanel />}
+      {tab === 'privacy' && <PrivacyPanel />}
+      {tab === 'schedules' && <SchedulesPanel />}
+      {tab === 'delegations' && <DelegationsPanel />}
+      {tab === 'integrations' && <IntegrationsPanel />}
 
       {tab === 'plan' && can('admin.subscription') && (
         <div className="grid-2">
@@ -111,15 +122,15 @@ export default function Admin() {
             <h3>Current plan — {tenant.plan}</h3>
             <p className="muted sm">Seats used: {seats}. AI assistant credits this cycle: {tenant.aiAssistCredits}.</p>
             <div className="grid-2">
-              {(Object.keys(PLAN_PRICE) as (keyof typeof PLAN_PRICE)[]).filter(p => p !== 'enterprise').map(p => (
+              {SELF_SERVE_PLANS.filter(p => (tenant.type === 'service_provider') === p.startsWith('msp_')).map(p => (
                 <button key={p} className={`card flat card-tight`} style={{ textAlign: 'left', cursor: 'pointer', border: tenant.plan === p ? '1px solid var(--accent)' : '1px solid transparent' }}
-                  onClick={() => { try { setSubscriptionPlan(ctx, p as typeof tenant.plan); toast(`Plan changed to ${p}`); } catch (e) { toast((e as Error).message, 'bad'); } }}>
-                  <b className="sm capitalize">{p}</b>
-                  <div className="xs muted">{ngn(PLAN_PRICE[p]!)}/mo</div>
+                  onClick={async () => { try { await setSubscriptionPlan(ctx, p); toast('Opening secure checkout…'); } catch (e) { toast((e as Error).message, 'bad'); } }}>
+                  <b className="sm">{PLANS[p].name}</b>
+                  <div className="xs muted">{ngn(PLANS[p].monthlyNgn)}/mo · {PLANS[p].seats} seats</div>
                 </button>
               ))}
             </div>
-            <p className="xs faint">Plan changes are simulated in the demo — in production this flows through Paystack.</p>
+            <p className="xs faint">Demo previews plan changes locally. Live plan changes require verified Paystack checkout; entitlements update only after server-side verification.</p>
           </div>
         </div>
       )}
@@ -142,7 +153,7 @@ function DepartmentsPanel({ editable, departments, branches }: { editable: boole
       {editable && branches.length > 0 && (
         <div className="row">
           <input className="input" placeholder="New department…" value={name} onChange={e => setName(e.target.value)} aria-label="Department name" />
-          <button className="btn sm" disabled={name.trim().length < 2} onClick={() => { createDepartment(ctx, branches[0]!.id, name.trim()); setName(''); toast('Department added'); }}>Add</button>
+          <button className="btn sm" disabled={name.trim().length < 2} onClick={async () => { await createDepartment(ctx, branches[0]!.id, name.trim()); setName(''); toast('Department added'); }}>Add</button>
         </div>
       )}
     </div>
@@ -160,7 +171,7 @@ function OrgProfile() {
       <div className="field"><label>Legal name</label><input className="input" value={name} onChange={e => setName(e.target.value)} /></div>
       <div className="field"><label>HQ city</label>
         <select className="select" value={city} onChange={e => setCity(e.target.value)}>{['Lagos', 'Abuja', 'Port Harcourt', 'Ibadan', 'Kano'].map(c => <option key={c}>{c}</option>)}</select></div>
-      <button className="btn" disabled={!dirty} onClick={() => { updateTenantProfile(ctx, { name: name.trim(), city }); toast('Profile updated'); }}>Save profile</button>
+      <button className="btn" disabled={!dirty} onClick={async () => { await updateTenantProfile(ctx, { name: name.trim(), city }); toast('Profile updated'); }}>Save profile</button>
       <div className="kv" style={{ marginTop: 6 }}>
         <dt className="xs muted">Workspace URL</dt><dd className="mono xs">{tenant.slug}.app.techpros.com.ng</dd>
         <dt className="xs muted">Tenant type</dt><dd className="xs">{tenant.type === 'service_provider' ? 'Service provider' : 'Organisation'}</dd>
@@ -173,9 +184,9 @@ function OrgProfile() {
 function InviteModal({ onClose }: { onClose: () => void }) {
   const { ctx } = useSessionCtx();
   const [f, setF] = useState({ name: '', email: '', role: 'employee' as RoleId });
-  const submit = () => {
+  const submit = async () => {
     try {
-      inviteUser(ctx, f.name.trim(), f.email.trim(), f.role);
+      await inviteUser(ctx, f.name.trim(), f.email.trim(), f.role);
       toast(`Invitation sent to ${f.email} (email simulated in demo)`);
       onClose();
     } catch (e) { toast((e as Error).message, 'bad'); }

@@ -4,7 +4,8 @@ import { Link, useParams } from 'react-router-dom';
 import QRCode from 'qrcode';
 import { useSessionCtx } from '../../platform/session';
 import { useData } from '../../platform/store';
-import { depreciatedValue, updateAsset, createWorkOrder as createWO } from '../../platform/db';
+import { updateAsset, createWorkOrder as createWO } from '../../platform/actions';
+import { depreciatedValue } from '../../platform/db';
 import type { AssetLifecycle } from '../../platform/types';
 import { Badge, Empty, KV, PageHead, StatusBadge, toast } from '../../components/ui';
 import { Icon } from '../../components/icons';
@@ -37,14 +38,14 @@ export default function AssetDetail() {
   const wDays = asset.warrantyExpiry ? daysUntil(asset.warrantyExpiry) : null;
   const history = data.auditLogs.filter(a => a.entity === 'asset' && a.entityId === asset.id).slice(0, 10);
 
-  const setLifecycle = (lifecycle: AssetLifecycle) => {
+  const setLifecycle = async (lifecycle: AssetLifecycle) => {
     if (!can('assets.asset.update')) { toast('No permission to update assets', 'bad'); return; }
-    updateAsset(ctx, asset.id, { lifecycle });
+    await updateAsset(ctx, asset.id, { lifecycle });
     toast(`Lifecycle → ${lifecycle.replace(/_/g, ' ')}`);
   };
 
-  const raiseWorkOrder = () => {
-    const wId = createWO(ctx, {
+  const raiseWorkOrder = async () => {
+    const wId = await createWO(ctx, {
       title: `Corrective maintenance — ${asset.name}`, kind: 'corrective',
       assetId: asset.id, branchId: asset.branchId, dueAt: new Date(Date.now() + 3 * DAYS).toISOString(),
       checklist: ['Inspect and diagnose fault', 'Repair or replace components', 'Test under load', 'Return to service'],

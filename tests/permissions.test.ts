@@ -38,7 +38,7 @@ describe('permission engine', () => {
 
   it('provider staff get delegated access inside client tenants', () => {
     const stives = data.tenants.find(t => t.id === DEMO.stives)!;
-    const ctx = accessContextFor(data.memberships, DEMO_USERS.yusuf, DEMO.stives, stives.providerId)!;
+    const ctx = accessContextFor(data.memberships, DEMO_USERS.yusuf, DEMO.stives, stives.providerId, data.delegations)!;
     expect(ctx).not.toBeNull();
     expect(ctx.delegated).toBe(true);
     expect(can(ctx, 'itsm.ticket.update')).toBe(true);

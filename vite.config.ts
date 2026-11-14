@@ -8,6 +8,7 @@ export default defineConfig({
     // Arena/e2b preview proxies a generated host; permissive allowlist keeps previews working.
     allowedHosts: true,
     host: '0.0.0.0',
+    proxy: { '/api': { target: 'http://127.0.0.1:8787', changeOrigin: true } },
   },
   test: {
     environment: 'jsdom',
@@ -21,11 +22,11 @@ export default defineConfig({
     chunkSizeWarningLimit: 700,
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom', 'react-router-dom'],
-          motion: ['framer-motion'],
-          charts: ['recharts'],
-          anim: ['gsap', '@gsap/react', 'lenis', 'ogl'],
+        manualChunks(id) {
+          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom') || id.includes('node_modules/react-router')) return 'vendor';
+          if (id.includes('node_modules/framer-motion')) return 'motion';
+          if (id.includes('node_modules/recharts') || id.includes('node_modules/d3-')) return 'charts';
+          if (id.includes('node_modules/gsap') || id.includes('node_modules/@gsap') || id.includes('node_modules/lenis') || id.includes('node_modules/ogl')) return 'anim';
         },
       },
     },

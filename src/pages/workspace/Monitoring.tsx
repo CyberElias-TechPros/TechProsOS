@@ -4,7 +4,8 @@ import { useSearchParams } from 'react-router-dom';
 import { useSessionCtx } from '../../platform/session';
 import { useData } from '../../platform/store';
 import { fleetHealth } from '../../platform/metrics';
-import { acknowledgeAlert, resolveAlert, simulateDeviceOutage } from '../../platform/db';
+import { acknowledgeAlert, resolveAlert, simulateDeviceOutage, createDevice } from '../../platform/actions';
+import { Modal } from '../../components/ui';
 import type { Device } from '../../platform/types';
 import { Badge, Empty, PageHead, Table, toast } from '../../components/ui';
 import { Icon, type IconName } from '../../components/icons';
@@ -47,12 +48,12 @@ function Topology({ devices, sel, onSelect }: { devices: Device[]; sel?: string;
       {links.map(l => {
         const a = pos.get(l.from.id)!; const b = pos.get(l.to.id)!;
         const bad = l.to.status === 'down' || l.from.status === 'down';
-        return <line key={`${a.x}-${b.x}`} className={`topo-link ${bad ? 'off' : ''}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} />;
+        return <line key={`${l.from.id}-${l.to.id}`} className={`topo-link ${bad ? 'off' : ''}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} />;
       })}
       {devices.map(d => {
         const p = pos.get(d.id)!; const cls = d.status === 'up' ? 'up' : d.status === 'degraded' ? 'degraded' : 'down';
         return (
-          <g key={d.id} className="topo-node" onClick={() => onSelect(d.id)} style={{ cursor: 'pointer' }}>
+          <g key={d.id} className="topo-node" role="button" tabIndex={0} aria-label={`Select ${d.name}`} onClick={() => onSelect(d.id)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(d.id); } }} style={{ cursor: 'pointer' }}>
             <circle cx={p.x} cy={p.y} r={24} fill={sel === d.id ? 'rgba(77,141,255,.22)' : 'rgba(255,255,255,.04)'} stroke={d.status === 'up' ? '#34d399' : d.status === 'degraded' ? '#e8a13c' : '#ff6a5c'} strokeWidth={sel === d.id ? 2.5 : 1.5} />
             <foreignObject x={p.x - 12} y={p.y - 11} width={24} height={24} pointerEvents="none">
               <div style={{ display: 'grid', placeItems: 'center', height: '100%', color: '#cfe0f5' }}>
@@ -75,6 +76,8 @@ export default function Monitoring() {
   const [params, setParams] = useSearchParams();
   const selId = params.get('device') ?? undefined;
   const [refreshTick, setRefreshTick] = useState(Date.now());
+  const [addOpen, setAddOpen] = useState(false); const [newToken, setNewToken] = useState<string | null>(null);
+  const mode = useData(s => s.mode);
 
   const devices = data.devices.filter(d => d.tenantId === ctx.tenantId);
   const monitored = devices.filter(d => d.monitored);
@@ -92,11 +95,12 @@ export default function Monitoring() {
           <div className="row">
             <span className="xs muted no-print">refreshed {fmtTimeAgo(new Date(refreshTick).toISOString())}</span>
             <button className="btn secondary sm no-print" onClick={() => setRefreshTick(Date.now())}><Icon name="refresh" size={13} /> Refresh</button>
-            {can('infrastructure.device.manage') && (
-              <button className="btn secondary sm" onClick={() => {
+            {can('infrastructure.device.manage') && <button className="btn sm" onClick={() => setAddOpen(true)}><Icon name="plus" size={13} /> Add device</button>}
+            {can('infrastructure.device.manage') && mode === 'demo' && (
+              <button className="btn secondary sm" onClick={async () => {
                 const up = monitored.find(d => d.status === 'up');
                 if (!up) return toast('Nothing healthy to simulate against', 'info');
-                const r = simulateDeviceOutage(ctx, up.id);
+                const r = await simulateDeviceOutage(ctx, up.id);
                 toast(r.deduped ? `${up.name} already has an open incident` : `Outage on ${up.name} → incident opened`, 'info');
               }}><Icon name="zap" size={13} /> Simulate outage</button>
             )}
@@ -120,6 +124,9 @@ export default function Monitoring() {
           ? <Topology devices={devices} sel={selId} onSelect={setSel} />
           : <Empty icon="infra" title="No devices yet" hint="Register devices in this workspace to draw the map." />}
       </div>
+
+      {addOpen && <DeviceModal onClose={() => setAddOpen(false)} onCreated={token => { setAddOpen(false); if (token) setNewToken(token); }} />}
+      {newToken && <Modal open onClose={() => setNewToken(null)} title="Device ingest token"><p className="sm muted">Copy this token now; it is shown once. Configure the monitoring agent with the tenant and device IDs from the fleet table.</p><code className="card flat pad mono sm" style={{ wordBreak: 'break-all' }}>{newToken}</code><button className="btn block" onClick={() => setNewToken(null)}>Done</button></Modal>}
 
       {sel && (
         <div className="card pad-lg">
@@ -155,8 +162,8 @@ export default function Monitoring() {
               </span>
               <span className="row" style={{ gap: 6 }}>
                 <Badge tone={a.status === 'active' ? 'bad' : a.status === 'acknowledged' ? 'warn' : 'ok'}>{a.status}</Badge>
-                {can('infrastructure.alert.manage') && a.status === 'active' && <button className="btn sm secondary" onClick={() => { acknowledgeAlert(ctx, a.id); toast('Acknowledged'); }}>Ack</button>}
-                {can('infrastructure.alert.manage') && a.status !== 'resolved' && <button className="btn sm ghost" onClick={() => { resolveAlert(ctx, a.id); toast('Marked resolved'); }}>Resolve</button>}
+                {can('infrastructure.alert.manage') && a.status === 'active' && <button className="btn sm secondary" onClick={async () => { await acknowledgeAlert(ctx, a.id); toast('Acknowledged'); }}>Ack</button>}
+                {can('infrastructure.alert.manage') && a.status !== 'resolved' && <button className="btn sm ghost" onClick={async () => { await resolveAlert(ctx, a.id); toast('Marked resolved'); }}>Resolve</button>}
               </span>
             </div>
           );
@@ -181,4 +188,23 @@ export default function Monitoring() {
       </div>
     </div>
   );
+}
+
+function DeviceModal({ onClose, onCreated }: { onClose: () => void; onCreated: (token?: string) => void }) {
+  const { ctx } = useSessionCtx(); const data = useData(s => s.data);
+  const branches = data.branches.filter(b => b.tenantId === ctx.tenantId);
+  const [f, setF] = useState({ name: '', kind: 'router' as Device['kind'], model: '', ip: '', branchId: branches[0]?.id ?? '', monitored: true });
+  const [busy, setBusy] = useState(false);
+  const submit = async () => { setBusy(true); try { const r = await createDevice(ctx, f); toast('Device registered'); onCreated(r.deviceToken); } catch (e) { toast((e as Error).message, 'bad'); } finally { setBusy(false); } };
+  return <Modal open onClose={onClose} title="Register monitored device">
+    <div className="form-grid">
+      <div className="field"><label htmlFor="dev-name">Name</label><input id="dev-name" className="input" value={f.name} onChange={e => setF({ ...f, name: e.target.value })} autoFocus /></div>
+      <div className="field"><label htmlFor="dev-kind">Kind</label><select id="dev-kind" className="select" value={f.kind} onChange={e => setF({ ...f, kind: e.target.value as Device['kind'] })}>{Object.keys(KIND_ICON).map(k => <option key={k} value={k}>{k}</option>)}</select></div>
+      <div className="field"><label htmlFor="dev-model">Model</label><input id="dev-model" className="input" value={f.model} onChange={e => setF({ ...f, model: e.target.value })} /></div>
+      <div className="field"><label htmlFor="dev-ip">IP address</label><input id="dev-ip" className="input" value={f.ip} onChange={e => setF({ ...f, ip: e.target.value })} placeholder="192.0.2.10" /></div>
+      <div className="field"><label htmlFor="dev-branch">Branch</label><select id="dev-branch" className="select" value={f.branchId} onChange={e => setF({ ...f, branchId: e.target.value })}>{branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select></div>
+      <label className="row sm" style={{ gap: 8, alignSelf: 'end' }}><input type="checkbox" checked={f.monitored} onChange={e => setF({ ...f, monitored: e.target.checked })} /> Monitored</label>
+    </div>
+    <button className="btn block" disabled={busy || !f.name.trim() || !f.branchId} onClick={submit}>{busy ? 'Registering…' : 'Register device'}</button>
+  </Modal>;
 }

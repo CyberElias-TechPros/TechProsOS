@@ -149,9 +149,23 @@ export interface AccessContext {
   role: RoleId;
   /** true when the user reached this tenant through a provider client relationship */
   delegated: boolean;
+  branchId?: ID;
+  departmentId?: ID;
+  /** Explicit client-approved grant; only used for delegated access. */
+  grantedPermissions?: readonly Permission[];
+  delegationExpiresAt?: string;
 }
 
-export function can(ctx: AccessContext, perm: Permission): boolean {
+/** Client administration, billing and tenant ownership are never delegated. */
+export const DELEGATABLE_PERMISSIONS: readonly Permission[] = EVERYTHING.filter(p =>
+  !p.startsWith('admin.') && !p.startsWith('clients.') && !p.startsWith('finance.') &&
+  !p.endsWith('.create') && !p.endsWith('.approve') && !p.endsWith('.dispose') && p !== 'ai.assistant.use');
+
+export function can(ctx: AccessContext, perm: Permission, nowMs = Date.now()): boolean {
+  if (ctx.delegated) {
+    if (!ctx.grantedPermissions || (ctx.delegationExpiresAt && Date.parse(ctx.delegationExpiresAt) <= nowMs)) return false;
+    return DELEGATABLE_PERMISSIONS.includes(perm) && ctx.grantedPermissions.includes(perm) && permissionsForRole(ctx.role).has(perm);
+  }
   return permissionsForRole(ctx.role).has(perm);
 }
 
@@ -176,16 +190,22 @@ export function membershipIn(memberships: Membership[], userId: ID, tenantId: ID
  * the same role-based permissions evaluated against that role.
  */
 export function accessContextFor(
-  memberships: Membership[],
-  userId: ID,
-  tenantId: ID,
+  memberships: Membership[], userId: ID, tenantId: ID,
   tenantProviderId: ID | undefined,
+  delegations: import('./types').Delegation[] = [],
+  nowMs = Date.now(),
 ): AccessContext | null {
   const direct = membershipIn(memberships, userId, tenantId);
-  if (direct) return { userId, tenantId, role: direct.role, delegated: false };
+  if (direct) return { userId, tenantId, role: direct.role, delegated: false, branchId: direct.branchId, departmentId: direct.departmentId };
   if (tenantProviderId) {
     const viaProvider = membershipIn(memberships, userId, tenantProviderId);
-    if (viaProvider) return { userId, tenantId, role: viaProvider.role, delegated: true };
+    const grant = delegations.find(g => g.tenantId === tenantId && g.providerId === tenantProviderId &&
+      g.userId === userId && g.status === 'active' && Date.parse(g.expiresAt) > nowMs);
+    if (viaProvider && grant) return {
+      userId, tenantId, role: viaProvider.role, delegated: true,
+      grantedPermissions: grant.permissions.filter(p => DELEGATABLE_PERMISSIONS.includes(p)),
+      delegationExpiresAt: grant.expiresAt,
+    };
   }
   return null;
 }

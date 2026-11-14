@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSessionCtx } from '../../platform/session';
 import { useData } from '../../platform/store';
-import { onboardClient } from '../../platform/db';
+import { onboardClient } from '../../platform/actions';
 import { Badge, Empty, Modal, PageHead, StatusBadge, Table, toast } from '../../components/ui';
 import { Icon } from '../../components/icons';
 import { daysUntil, NIGERIAN_CITIES, ngn } from '../../platform/util';
@@ -115,8 +115,8 @@ export default function Clients() {
 function OnboardModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { ctx } = useSessionCtx();
   const [f, setF] = useState({ name: '', industry: 'Education', city: 'Lagos', contactName: '', contactEmail: '', tier: 'Managed' as 'Essential' | 'Managed' | 'Premium', monthlyFee: 250_000 });
-  const submit = () => {
-    const id = onboardClient(ctx, { ...f, name: f.name.trim(), contactName: f.contactName.trim(), contactEmail: f.contactEmail.trim() });
+  const submit = async () => {
+    const id = await onboardClient(ctx, { ...f, name: f.name.trim(), contactName: f.contactName.trim(), contactEmail: f.contactEmail.trim() });
     toast('Client workspace provisioned with its own SLA policy');
     onClose();
     void id;
