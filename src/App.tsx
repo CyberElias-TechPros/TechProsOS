@@ -5,12 +5,12 @@ import { AppShell } from './app/AppShell';
 import type { SessionInfo } from './platform/session';
 import type { Permission } from './platform/permissions';
 
-// marketing + auth (eager: tiny)
-import LandingPage from './pages/marketing/Landing';
-import PricingPage from './pages/marketing/Pricing';
-import LoginPage from './pages/auth/Login';
-import OnboardingPage from './pages/auth/Onboarding';
-import FreeToolsPage from './pages/marketing/FreeTools';
+// marketing + auth: lazy too, so the workspace shell doesn't pay for graphics libs
+const LandingPage = lazy(() => import('./pages/marketing/Landing'));
+const PricingPage = lazy(() => import('./pages/marketing/Pricing'));
+const FreeToolsPage = lazy(() => import('./pages/marketing/FreeTools'));
+const LoginPage = lazy(() => import('./pages/auth/Login'));
+const OnboardingPage = lazy(() => import('./pages/auth/Onboarding'));
 
 // workspace modules (lazy: chunky libs live here — recharts, qrcode)
 const Overview = lazy(() => import('./pages/workspace/Overview'));

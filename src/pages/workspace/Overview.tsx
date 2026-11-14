@@ -7,9 +7,11 @@ import { useData } from '../../platform/store';
 import { itsmStats, slaCompliance, visibleTickets, slaBadgeState, riskExposure, overdueInvoices, expiringAgreements, workCalFor } from '../../platform/metrics';
 import { Badge, Empty, PageHead, StatusBadge, toast } from '../../components/ui';
 import { Icon } from '../../components/icons';
-import { fmtDuration, fmtTimeAgo, ngn, pct } from '../../platform/util';
+import { fmtDuration, fmtTimeAgo, pct } from '../../platform/util';
 import { acknowledgeAlert, simulateDeviceOutage } from '../../platform/db';
 import { branchName } from './lookups';
+import { CountUp } from '../../components/bits/CountUp';
+import { Reveal } from '../../app/motion';
 
 const CHART_COLORS = { accent: '#1d63ed', ok: '#0d9263', warn: '#e8a13c', bad: '#c93a2b', info: '#0e7490', violet: '#6d5bd0' };
 const CAT_COLORS = ['#1d63ed', '#0ea5e9', '#6d5bd0', '#0d9263', '#e8a13c', '#c93a2b', '#0e7490'];
@@ -48,18 +50,22 @@ export default function Overview() {
       {/* KPI strip */}
       <div className="grid-4">
         {[
-          { label: 'Open tickets', value: stats.open, to: '/app/service-desk', sub: `${stats.criticalOpen} critical`, tone: stats.criticalOpen ? 'var(--bad)' : undefined },
-          { label: 'SLA compliance', value: sla == null ? '—' : `${sla}%`, to: '/app/reports', sub: `${breached} breached · ${atRisk} at risk`, tone: sla != null && sla < 85 ? 'var(--warn)' : 'var(--ok)' },
-          { label: 'Fleet health', value: `${pct(devices.filter(d => d.status === 'up').length, Math.max(1, devices.filter(d => d.monitored).length))}%`, to: '/app/monitoring', sub: `${devices.filter(d => d.status !== 'up').length} need attention` },
+          { label: 'Open tickets', num: stats.open, to: '/app/service-desk', sub: `${stats.criticalOpen} critical`, tone: stats.criticalOpen ? 'var(--bad)' : undefined },
+          { label: 'SLA compliance', num: sla ?? undefined, suffix: '%', to: '/app/reports', sub: `${breached} breached · ${atRisk} at risk`, tone: sla != null && sla < 85 ? 'var(--warn)' : 'var(--ok)' },
+          { label: 'Fleet health', num: pct(devices.filter(d => d.status === 'up').length, Math.max(1, devices.filter(d => d.monitored).length)), suffix: '%', to: '/app/monitoring', sub: `${devices.filter(d => d.status !== 'up').length} need attention` },
           isExec
-            ? { label: 'Overdue receivables', value: ngn(inv.overdueAmount || 0, { compact: true }), to: '/app/finance', sub: `${inv.count} invoice${inv.count === 1 ? '' : 's'} overdue`, tone: inv.count ? 'var(--bad)' : 'var(--ok)' }
-            : { label: 'My queue', value: myQueue.length, to: '/app/service-desk?assignee=me', sub: 'assigned to you' },
-        ].map(k => (
-          <Link key={k.label} to={k.to} className="card kpi" style={{ textDecoration: 'none', color: 'inherit' }}>
-            <span className="k-label">{k.label}</span>
-            <span className="k-value" style={k.tone ? { color: k.tone } : undefined}>{k.value}</span>
-            <span className="k-sub">{k.sub}</span>
-          </Link>
+            ? { label: 'Overdue receivables', num: Math.round((inv.overdueAmount || 0) / 1000), prefix: '₦', suffix: 'k', to: '/app/finance', sub: `${inv.count} invoice${inv.count === 1 ? '' : 's'} overdue`, tone: inv.count ? 'var(--bad)' : 'var(--ok)' }
+            : { label: 'My queue', num: myQueue.length, to: '/app/service-desk', sub: 'assigned to you' },
+        ].map((k, i) => (
+          <Reveal key={k.label} delay={i * 0.05} y={14}>
+            <Link to={k.to!} className="card kpi overview-kpi" style={{ textDecoration: 'none', color: 'inherit' }}>
+              <span className="k-label">{k.label}</span>
+              <span className="k-value" style={k.tone ? { color: k.tone } : undefined}>
+                {k.num == null ? '—' : <CountUp to={k.num} prefix={k.prefix ?? ''} suffix={k.suffix ?? ''} triggerOnScroll={false} />}
+              </span>
+              <span className="k-sub">{k.sub}</span>
+            </Link>
+          </Reveal>
         ))}
       </div>
 

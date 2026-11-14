@@ -1,6 +1,7 @@
 /** AppShell — sidebar navigation, topbar, command palette, notification centre. */
 import { useMemo, useRef, useState, useEffect } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { useSessionInfo, useUiPrefs, useSession } from '../platform/session';
 import { useData } from '../platform/store';
 import { visibleTickets } from '../platform/metrics';
@@ -249,8 +250,10 @@ export function AppShell() {
           <NotificationsBell />
           <UserMenu />
         </div>
-        <main className="main-content">
-          <Outlet />
+        <main className="main-content" key={location.pathname}>
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}>
+            <Outlet />
+          </motion.div>
         </main>
       </div>
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />

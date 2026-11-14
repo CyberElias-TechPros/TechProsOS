@@ -7,9 +7,11 @@ import './styles/app.css';
 import { useApplyTheme, useSessionInfo } from './platform/session';
 import { SessionProvider } from './platform/session';
 import { ToastRegion } from './components/ui';
+import { useLenis } from './app/motion';
 
 function Root() {
   useApplyTheme();
+  useLenis();
   const info = useSessionInfo();
   return (
     <SessionProvider value={info}>

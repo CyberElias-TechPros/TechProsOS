@@ -1,138 +1,204 @@
-/** Public landing — editorial hero + proof. Elegant, light-touch motion. */
-import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
+/** Public landing — showpiece: Aurora hero, split-text headline, velocity marquee, spotlight cards. */
+import { Link, useNavigate } from 'react-router-dom';
 import { Icon, type IconName } from '../../components/icons';
-import { MktNav, MktFooter, reveal, stagger } from './chrome';
+import { MktNav, MktFooter } from './chrome';
+import { Aurora } from '../../components/bits/Aurora';
+import { BlurText, GradientText, ShinyText } from '../../components/bits/BlurText';
+import { SplitText } from '../../components/bits/SplitText';
+import { CountUp } from '../../components/bits/CountUp';
+import { ClickSpark, Magnet, SpotlightCard, StarBorder, Tilt } from '../../components/bits/SpotlightCard';
+import { ScrollVelocity } from '../../components/bits/ScrollVelocity';
+import { Reveal, StaggerGroup } from '../../app/motion';
 
-const MODULES: { icon: IconName; title: string; body: string }[] = [
-  { icon: 'tickets', title: 'Service desk, SLAs that hold', body: 'Impact × urgency priority matrix, business-hours SLA clocks in West African Time, escalation and CSAT — not just a ticket list.' },
-  { icon: 'assets', title: 'Asset & inventory command', body: 'Every laptop, UPS and firewall tracked to a branch and person, with QR labels, depreciation and warranty alerts.' },
-  { icon: 'infra', title: 'Monitoring built for NOCs', body: 'Live topology, device health, and alerts that become incidents automatically — designed for dark control-room screens.' },
-  { icon: 'finance', title: 'Speak naira, fluently', body: 'Invoices with 7.5% VAT and 5%/10% WHT handled correctly. Budgets, expenses and cost centres your CFO understands.' },
-  { icon: 'compliance', title: 'Compliance, NDPA-ready', body: 'ISO 27001, NIST CSF and NDPA evidence trails with risk registers and findings — audit season stops being a fire drill.' },
-  { icon: 'ai', title: 'An assistant that knows the data', body: 'Ask “which sites breached SLA this month?” and get an answer grounded in your live numbers — with links to act.' },
+const MODULES: { icon: IconName; title: string; body: string; tag: string }[] = [
+  { icon: 'tickets', title: 'Service desk, SLAs that hold', body: 'Impact × urgency priority matrix, business-hours SLA clocks in WAT, escalation and CSAT — not just a ticket list.', tag: 'ITSM' },
+  { icon: 'assets', title: 'Asset & inventory command', body: 'Every laptop, UPS and firewall tracked to a branch and person, with QR labels, depreciation and warranty alerts.', tag: 'CMDB' },
+  { icon: 'infra', title: 'Monitoring built for NOCs', body: 'Live topology, device health, alerts that become incidents automatically — designed for dark control-room screens.', tag: 'NOC' },
+  { icon: 'projects', title: 'Projects with budget truth', body: 'Deployments and rollouts with kanban boards, milestones and spend burn — not spreadsheets in a drive folder.', tag: 'PMO' },
+  { icon: 'compliance', title: 'Compliance, NDPA-ready', body: 'ISO 27001, NIST CSF and NDPA evidence trails with risk registers — audit season stops being a fire drill.', tag: 'GRC' },
+  { icon: 'finance', title: 'Speak naira, fluently', body: 'Invoices with 7.5% VAT and 5%/10% WHT handled correctly. Budgets, expenses and cost centres your CFO understands.', tag: 'FIN' },
 ];
 
-const AUDIENCES = [
-  ['Schools & colleges', 'Wireless estates, exam-season uptime, asset registers for bursars.'],
-  ['Hospitals & clinics', 'HIS support queues, biomedical equipment maintenance, NDPA-sensitive records.'],
-  ['Banks & corporates', 'Multi-branch SLAs, capacity budgets, auditor-grade evidence.'],
-  ['ISPs & MSPs', 'A whole service-provider workspace: clients, contracts, field engineers, billing.'],
-  ['SMEs & NGOs', 'Enterprise discipline at Lagos-friendly prices, on 3G-friendly pages.'],
+const PROOF = [
+  { v: 99.7, suffix: '%', decimals: 1, label: 'SLA compliance, one click away' },
+  { v: 40, suffix: '%', label: 'Lighter pages than typical suites' },
+  { v: 15, suffix: '', label: 'Modules that share one data fabric' },
+  { v: 13, suffix: '', label: 'Roles with least-privilege defaults' },
 ];
+
+const LOOP_ITEMS = ['Service Desk', 'Asset Register', 'NOC Topology', 'Preventive Maintenance', 'Client Console', 'Project Delivery', 'Knowledge Base', 'Risk Register', 'Procurement', 'Naira Invoicing', 'AI Assistant', 'Audit Trail'];
+
+function HeroCard() {
+  return (
+    <Tilt intensity={7} scale={1.01} className="hero-card-tilt">
+      <div className="hero-mock" aria-hidden>
+        <div className="hm-top"><span /><span /><span /><b>Greenfield Academy · Service Desk</b></div>
+        <div className="hm-kpis">
+          {[['SLA to respond', '47m left', 'ok'], ['Open critical', '1', 'bad'], ['Availability', '99.3%', 'ok']].map(([l, v, t]) => (
+            <div key={l} className="hm-kpi"><span className="hm-l">{l}</span><b className={t}>{v}</b></div>
+          ))}
+        </div>
+        <div className="hm-rows">
+          {[
+            ['TKT-1030', 'Storage 92% — archive recommended', 'critical', 'Breaching in 40m'],
+            ['TKT-1025', 'Wi-Fi drops around Block B science labs', 'high', 'Assigned · Yusuf A.'],
+            ['TKT-1022', 'Setup accounts for 3 new bursary staff', 'medium', 'In progress'],
+          ].map(([n, t, p, s]) => (
+            <div key={n} className="hm-row"><span className="hm-num">{n}</span><span className="hm-t">{t}</span><span className={`hm-pill ${p}`}>{p}</span><span className="hm-s">{s}</span></div>
+          ))}
+        </div>
+        <div className="hm-foot"><i /> <span>Business-hours SLA · WAT calendar · Mon–Sat</span></div>
+      </div>
+    </Tilt>
+  );
+}
 
 export default function LandingPage() {
+  const navigate = useNavigate();
   return (
     <div className="mkt">
       <MktNav />
 
-      <section className="mkt-hero">
+      <section className="mkt-hero hero-v2">
+        <Aurora colors={['#0a1733', '#1d63ed', '#22d3ee']} intensity={0.8} speed={0.45} />
         <div className="hero-grid-bg" aria-hidden />
-        <div className="hero-glow" aria-hidden />
-        <div className="inner">
-          <motion.div variants={stagger} initial="hidden" animate="show">
-            <motion.div variants={reveal} className="mkt-eyebrow" style={{ color: '#7db3ff' }}>
-              IT operations · Service delivery · Business technology
-            </motion.div>
-            <motion.h1 variants={reveal}>
-              Run IT like the<br />business depends on it.<br /><span style={{ color: '#7db3ff' }}>Because it does.</span>
-            </motion.h1>
-            <motion.p variants={reveal} className="lede">
-              TechPros One is the IT operations platform built for Nigerian schools, hospitals,
-              corporates and the service providers who keep them running. Tickets, assets, monitoring,
-              procurement and reports — one workspace, priced in naira, honest about power and bandwidth.
-            </motion.p>
-            <motion.div variants={reveal} className="row" style={{ marginTop: 26, gap: 12 }}>
-              <Link to="/signup" className="btn lg" style={{ boxShadow: '0 6px 24px rgba(37,99,235,.45)' }}>
-                Start your organisation <Icon name="arrowRight" size={16} />
-              </Link>
-              <Link to="/login" className="btn lg secondary" style={{ background: 'rgba(255,255,255,.08)', color: '#e9f0fb', borderColor: 'rgba(255,255,255,.18)' }}>
-                Explore the live demo
-              </Link>
-            </motion.div>
-            <motion.div variants={reveal} className="row" style={{ marginTop: 30, gap: 22 }}>
-              {['Set up in a day', 'NDPA-ready trails', 'Mobile-first & low-data'].map(x => (
-                <span key={x} className="sm" style={{ color: '#9db3d4', display: 'inline-flex', alignItems: 'center', gap: 7 }}>
-                  <Icon name="check" size={14} style={{ color: '#34d399' }} /> {x}
-                </span>
-              ))}
-            </motion.div>
-          </motion.div>
-        </div>
-      </section>
-
-      <section className="mkt-section">
-        <motion.div initial="hidden" whileInView="show" viewport={{ once: true, margin: '-80px' }} variants={stagger}>
-          <motion.div variants={reveal} className="mkt-eyebrow">One platform, every discipline</motion.div>
-          <motion.h2 variants={reveal} className="mkt-h2">Fifteen modules that finally talk to each other</motion.h2>
-          <motion.p variants={reveal} className="mkt-sub">
-            An alert becomes an incident. An incident consumes an asset record. The resolution updates the knowledge base,
-            the report lands on the executive dashboard. No export-import gymnastics.
-          </motion.p>
-          <motion.div variants={stagger} className="grid-3" style={{ marginTop: 34 }}>
-            {MODULES.map(m => (
-              <motion.div key={m.title} variants={reveal} className="card pad-lg" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <span style={{ width: 42, height: 42, borderRadius: 11, display: 'grid', placeItems: 'center', background: 'var(--accent-soft)', color: 'var(--accent)' }}>
-                  <Icon name={m.icon} size={20} />
-                </span>
-                <h3>{m.title}</h3>
-                <p className="muted" style={{ fontSize: 13.5, lineHeight: 1.6 }}>{m.body}</p>
-              </motion.div>
-            ))}
-          </motion.div>
-        </motion.div>
-      </section>
-
-      <section className="mkt-section" style={{ paddingTop: 0 }}>
-        <div className="card pad-lg" style={{ background: 'var(--ink)', color: 'var(--ink-fg)', border: 'none', overflow: 'hidden', position: 'relative' }}>
-          <div className="hero-glow" style={{ opacity: .4, top: -400, right: -200 }} aria-hidden />
-          <div className="grid-2" style={{ position: 'relative' }}>
-            <div className="stack" style={{ gap: 14 }}>
-              <div className="mkt-eyebrow" style={{ color: '#7db3ff', margin: 0 }}>Two workspaces, one fabric</div>
-              <h2 style={{ fontSize: 27, letterSpacing: '-.02em' }}>Organisations run their IT.<br />Providers run everyone’s.</h2>
-              <p style={{ color: '#9db3d4', fontSize: 14.5, lineHeight: 1.7 }}>
-                A school’s IT manager sees their branches. Their MSP logs into the provider
-                console and sees every client — with the same tickets, assets and SLAs,
-                isolated per tenant with delegated access.
-              </p>
-              <div className="row"><Link to="/signup" className="btn">Open a provider workspace</Link></div>
+        <div className="inner hero-split">
+          <div>
+            <ShinyText text="IT OPERATIONS · SERVICE DELIVERY · NIGERIA-FIRST" className="mkt-eyebrow" shineDelay={4} style={{ color: '#7db3ff', letterSpacing: '.14em', fontWeight: 700, fontSize: 11.5 }} />
+            <h1 className="hero-h1">
+              <SplitText text="Your technology," by="chars" delay={0.15} />
+              <br />
+              <span className="hero-h1-blue">
+                <SplitText text="under control." by="chars" delay={0.55} />
+              </span>
+            </h1>
+            <BlurText
+              className="lede"
+              text="TechPros One is the IT operations platform built for Nigerian schools, hospitals, corporates and the service providers who keep them running. Tickets, assets, monitoring, procurement and reports — one workspace, priced in naira."
+              animateBy="words" stepMs={26} delay={900} as="p"
+            />
+            <div className="row hero-cta">
+              <Magnet strength={10}>
+                <ClickSpark sparkColor="#ffd166">
+                  <StarBorder beamColor="#ffd166" duration={3.4} onClick={() => navigate('/signup')}>
+                    Start your organisation <Icon name="arrowRight" size={15} />
+                  </StarBorder>
+                </ClickSpark>
+              </Magnet>
+              <Magnet strength={10}>
+                <Link to="/login" className="btn lg hero-ghost">Explore the live demo</Link>
+              </Magnet>
             </div>
-            <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', alignContent: 'center' }}>
-              {AUDIENCES.map(([t, b]) => (
-                <div key={t} className="card flat" style={{ background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.09)' }}>
-                  <b className="sm" style={{ color: '#e9f0fb' }}>{t}</b>
-                  <p className="xs" style={{ color: '#93a7c4', marginTop: 4, lineHeight: 1.5 }}>{b}</p>
-                </div>
+            <div className="row hero-trust">
+              {['Set up in a day', 'NDPA-ready trails', 'No card required'].map(x => (
+                <span key={x}><Icon name="check" size={13} style={{ color: '#34d399' }} /> {x}</span>
               ))}
             </div>
           </div>
+          <HeroCard />
         </div>
       </section>
 
-      <section className="mkt-section" style={{ paddingTop: 0 }}>
-        <div className="stat-strip" style={{ justifyContent: 'space-around', textAlign: 'center', gap: 30 }}>
-          {[
-            ['99.7%', 'SLA compliance visible in one click'],
-            ['40%', 'lighter pages than typical enterprise suites'],
-            ['₦', 'Native invoicing — VAT & WHT done right'],
-            ['13', 'roles with least-privilege defaults'],
-          ].map(([v, l]) => (
-            <div key={l} style={{ alignItems: 'center', maxWidth: 200 }}>
-              <div style={{ fontSize: 32, fontWeight: 800, letterSpacing: '-.03em', color: 'var(--accent)' }}>{v}</div>
-              <div className="sm muted">{l}</div>
-            </div>
+      <section className="loop-band" aria-hidden>
+        <ScrollVelocity baseVelocity={46}>
+          {LOOP_ITEMS.map(x => (
+            <span key={x} className="loop-item"><Icon name="zap" size={13} />{x}</span>
+          ))}
+        </ScrollVelocity>
+      </section>
+
+      <section className="mkt-section">
+        <Reveal>
+          <div className="mkt-eyebrow">One platform, every discipline</div>
+          <h2 className="mkt-h2">Fifteen modules that <GradientText>finally talk to each other</GradientText></h2>
+          <p className="mkt-sub">An alert becomes an incident. An incident consumes an asset record. The resolution updates the knowledge base, and the report lands on the executive dashboard. No export-import gymnastics.</p>
+        </Reveal>
+        <div className="grid-3 module-grid">
+          {MODULES.map((m, i) => (
+            <Reveal key={m.title} delay={i * 0.06}>
+              <SpotlightCard className="pad-lg module-card" spotlightColor="rgba(90,162,255,.14)">
+                <div className="module-head">
+                  <span className="module-ico"><Icon name={m.icon} size={19} /></span>
+                  <span className="module-tag">{m.tag}</span>
+                </div>
+                <h3>{m.title}</h3>
+                <p className="muted" style={{ fontSize: 13.5, lineHeight: 1.65 }}>{m.body}</p>
+              </SpotlightCard>
+            </Reveal>
           ))}
         </div>
       </section>
 
-      <section className="mkt-section" style={{ textAlign: 'center', paddingTop: 10 }}>
-        <div className="mkt-eyebrow">Pricing</div>
-        <h2 className="mkt-h2" style={{ margin: '0 auto' }}>Honest naira pricing. No dollar surprises when FX moves.</h2>
-        <p className="mkt-sub" style={{ margin: '10px auto 0' }}>Plans from ₦19,500/month for small organisations and ₦49,500/month for service providers.</p>
-        <div className="row" style={{ justifyContent: 'center', marginTop: 24 }}>
-          <Link to="/pricing" className="btn lg">See plans & pricing</Link>
-          <Link to="/free-tools" className="btn lg secondary">Use the free IT tools</Link>
+      <section className="mkt-section dual-band">
+        <div className="card pad-lg dual-card">
+          <Aurora colors={['#06101f', '#0e3f8f', '#0ea5e9']} intensity={0.55} speed={0.35} />
+          <div className="grid-2" style={{ position: 'relative' }}>
+            <div className="stack" style={{ gap: 16 }}>
+              <div className="mkt-eyebrow" style={{ color: '#7db3ff', margin: 0 }}>Two workspaces, one fabric</div>
+              <h2 style={{ fontSize: 27, letterSpacing: '-.02em', margin: 0 }}>Organisations run their IT.<br />Providers run everyone’s.</h2>
+              <p style={{ color: '#9db3d4', fontSize: 14.5, lineHeight: 1.7, maxWidth: '48ch' }}>
+                A school’s IT manager sees their branches. Their MSP logs into the provider console
+                and sees every client — the same tickets, assets and SLAs, isolated per tenant with
+                delegated access.
+              </p>
+              <div className="row">
+                <Magnet strength={8}>
+                  <ClickSpark sparkColor="#7dd3fc">
+                    <Link to="/signup" className="btn" style={{ boxShadow: '0 6px 24px rgba(37,99,235,.4)' }}>Open a provider workspace</Link>
+                  </ClickSpark>
+                </Magnet>
+              </div>
+            </div>
+            <StaggerGroup className="grid audience-grid">
+              {[
+                ['Schools & colleges', 'Exam-season uptime, asset registers for bursars.'],
+                ['Hospitals & clinics', 'HIS queues, biomedical maintenance, NDPA records.'],
+                ['Banks & corporates', 'Multi-branch SLAs, auditor-grade evidence.'],
+                ['ISPs & MSPs', 'A whole provider console: clients, contracts, field ops.'],
+                ['SMEs & NGOs', 'Enterprise discipline at Lagos prices, on 3G-friendly pages.'],
+                ['Public sector', 'Procurement trails that survive visibility.'],
+              ].map(([t, b]) => (
+                <Tilt key={t} intensity={6} scale={1.01}>
+                  <div className="audience-chip">
+                    <b className="sm">{t}</b>
+                    <p className="xs" style={{ marginTop: 4, lineHeight: 1.55 }}>{b}</p>
+                  </div>
+                </Tilt>
+              ))}
+            </StaggerGroup>
+          </div>
         </div>
+      </section>
+
+      <section className="mkt-section stat-band">
+        <StaggerGroup className="stat-strip" step={0.1}>
+          {PROOF.map(p => (
+            <div key={p.label} className="stat-cell">
+              <div className="stat-num">
+                <CountUp to={p.v} decimals={p.decimals ?? 0} suffix={p.suffix} />
+              </div>
+              <div className="sm muted">{p.label}</div>
+            </div>
+          ))}
+        </StaggerGroup>
+      </section>
+
+      <section className="mkt-section" style={{ textAlign: 'center', paddingTop: 8, paddingBottom: 90 }}>
+        <BlurText text="PRICED IN NAIRA" animateBy="letters" stepMs={40} className="mkt-eyebrow" />
+        <Reveal>
+          <h2 className="mkt-h2" style={{ margin: '0 auto', textAlign: 'center' }}>
+            No dollar surprises<br />when <GradientText colors={['#22d3ee', '#5aa2ff', '#a78bfa', '#22d3ee']}>FX moves.</GradientText>
+          </h2>
+          <p className="mkt-sub" style={{ margin: '12px auto 0' }}>From ₦19,500/month for organisations and ₦49,500/month for service providers.</p>
+          <div className="row" style={{ justifyContent: 'center', marginTop: 26, gap: 14 }}>
+            <Magnet strength={9}>
+              <ClickSpark>
+                <StarBorder onClick={() => navigate('/pricing')}>See plans & pricing</StarBorder>
+              </ClickSpark>
+            </Magnet>
+            <Link to="/free-tools" className="btn lg secondary">Use the free IT tools</Link>
+          </div>
+        </Reveal>
       </section>
 
       <MktFooter />

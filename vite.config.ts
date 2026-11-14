@@ -25,6 +25,7 @@ export default defineConfig({
           vendor: ['react', 'react-dom', 'react-router-dom'],
           motion: ['framer-motion'],
           charts: ['recharts'],
+          anim: ['gsap', '@gsap/react', 'lenis', 'ogl'],
         },
       },
     },
