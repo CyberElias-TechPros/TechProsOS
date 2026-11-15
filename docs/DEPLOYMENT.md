@@ -92,10 +92,14 @@ npm run db:migrate
 Push to the production branch or deploy via Vercel. Security headers and CSP are in `vercel.json`.
 
 Two routing details matter:
-- The API is **bundled** by `scripts/build-api.mjs` into a single `api/index.mjs`. Vercel
+- The API is **bundled** by `scripts/build-api.mjs` into `server-dist/vercel.mjs`. Vercel
   compiles `api/*.ts` with its own `nodenext` resolution, which rejects the extensionless
   relative imports used in `server/`; bundling removes TypeScript from the function entirely.
-  Never hand-edit `api/index.mjs` — it is generated and gitignored.
+- **`api/index.mjs` is a small tracked stub** that re-exports the bundle. It must stay committed:
+  Vercel discovers functions by globbing `api/` *before* the build command runs, so a generated
+  or gitignored file there is invisible and the deployment ships with **zero functions** (every
+  `/api/*` then 404s). The bundle itself lives in the gitignored `server-dist/`. Do not inline
+  server code into the stub, and do not move the bundle into `api/`.
 - Outside Next.js, Vercel maps `api/index.mjs` to `/api/index` only, and `[...path]` is *not*
   a catch-all. `vercel.json` therefore rewrites `/api/(.*)` → `/api/index`; the function still
   receives the original URL. The SPA rewrite excludes `/api/*`.

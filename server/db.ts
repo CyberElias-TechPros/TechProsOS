@@ -11,7 +11,13 @@ export interface Database {
 class PgDatabase implements Database {
   constructor(private client: pg.Pool | pg.PoolClient) {}
   async query<T = Record<string, unknown>>(sql: string, params: unknown[] = []): Promise<QueryResult<T>> {
-    const r = await this.client.query(sql, params); return { rows: r.rows as T[], rowCount: r.rowCount ?? r.rows.length };
+    // A parameterless multi-statement string (each migration is one DDL batch) goes over the
+    // simple query protocol, and node-postgres returns an ARRAY of results — one per statement —
+    // instead of a single result. Reading `.rows` off that array yields undefined. Collapse to
+    // the last statement's result, matching the PGlite wrapper below.
+    const r = await this.client.query(sql, params.length ? params : undefined);
+    const last = Array.isArray(r) ? r[r.length - 1] : r;
+    return { rows: (last?.rows ?? []) as T[], rowCount: last?.rowCount ?? last?.rows?.length ?? 0 };
   }
   async transaction<T>(fn: (tx: Database) => Promise<T>): Promise<T> {
     const pool = this.client as pg.Pool; const client = await pool.connect();
@@ -46,6 +52,12 @@ export function resolvePgConnection(url: string, caCert?: string): { connectionS
   else if (ca || ['require', 'verify-full', 'verify-ca', 'prefer'].includes(mode)) ssl = { ca, rejectUnauthorized: true };
   return { connectionString: parsed.toString(), ssl };
 }
+/**
+ * Wrap an already-constructed pg Pool/PoolClient. Exported so the result-normalisation
+ * behaviour (single result vs the array pg returns for multi-statement SQL) can be tested
+ * without a live database.
+ */
+export function postgresLike(client: pg.Pool | pg.PoolClient): Database { return new PgDatabase(client); }
 let pool: pg.Pool | undefined;
 export function postgres(url: string, options: { caCert?: string; max?: number } = {}): Database {
   const max = Math.max(1, Math.min(options.max ?? 3, 20));
