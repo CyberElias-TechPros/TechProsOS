@@ -1,12 +1,11 @@
 /**
- * Vercel serverless entry point. Bundled to api/index.mjs by scripts/build-api.mjs.
- * Kept in server/ (not api/) so Vercel never compiles it with its own tsconfig.
+ * Vercel serverless handler. Bundled to server-dist/vercel.mjs by scripts/build-api.mjs
+ * and re-exported by the tracked api/index.mjs stub. Kept out of api/ so Vercel never
+ * compiles the source with its own tsconfig.
  */
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { handleApi } from './api';
 import { configFromEnv } from './config';
-
-export const config = { maxDuration: 60 };
 
 export default async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const chunks: Buffer[] = []; let size = 0;

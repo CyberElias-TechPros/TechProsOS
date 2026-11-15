@@ -12,13 +12,19 @@
  *
  * `pg` stays external: it is a real dependency with optional native bindings that must
  * be resolved from node_modules at runtime, not inlined.
+ *
+ * The bundle is written to server-dist/, NOT api/. Vercel globs the api/ directory to
+ * discover functions BEFORE the build command runs, so a generated (gitignored) file
+ * placed there is invisible and the deployment ends up with zero functions. api/index.mjs
+ * is a small TRACKED stub that re-exports this bundle; its import is resolved after the
+ * build, when the bundle exists.
  */
 import { build } from 'esbuild';
 import { mkdir, rm } from 'node:fs/promises';
 
-const OUT = 'api/index.mjs';
+const OUT = 'server-dist/vercel.mjs';
 
-await mkdir('api', { recursive: true });
+await mkdir('server-dist', { recursive: true });
 // Remove any stale bundle so a failed build cannot ship the previous one.
 await rm(OUT, { force: true });
 
