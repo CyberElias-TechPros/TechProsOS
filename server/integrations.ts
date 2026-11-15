@@ -37,15 +37,18 @@ export async function deliverOutbox(db: Database, config: ServerConfig, limit = 
   return { sent, failed };
 }
 const PAYSTACK = 'https://api.paystack.co';
-export async function initializeCheckout(db: Database, config: ServerConfig, reference: string): Promise<string> {
+export async function initializeCheckout(db: Database, config: ServerConfig, reference: string, origin?: string): Promise<string> {
+  // Return the customer to the host they started checkout on. Paystack does not require the
+  // domain to be registered anywhere — callback_url is accepted per transaction.
+  const base = origin && config.allowedOrigins.includes(origin) ? origin : config.appUrl;
   if (!config.paystackKey) throw new DomainError('Paystack is not configured', 'BILLING_NOT_CONFIGURED', 503);
   const r = await db.query<{ recipient: string; expected_amount: string; kind: string; entity_id: string; tenant_id: string }>('SELECT c.*,u.email AS recipient FROM checkouts c JOIN users u ON u.id=c.created_by WHERE c.reference=$1', [reference]);
   const checkout = r.rows[0]; if (!checkout) throw new DomainError('Checkout not found', 'NOT_FOUND', 404);
   try {
     const response = await fetchJson(`${PAYSTACK}/transaction/initialize`, { method: 'POST', headers: { Authorization: `Bearer ${config.paystackKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify({
       email: checkout.recipient, amount: Number(checkout.expected_amount), currency: 'NGN', reference,
-      callback_url: `${config.appUrl}/app/admin?billing=verify&reference=${encodeURIComponent(reference)}`,
-      metadata: { checkout_reference: reference, tenant_id: checkout.tenant_id, kind: checkout.kind, entity_id: checkout.entity_id, cancel_action: `${config.appUrl}/app/admin?billing=cancelled` },
+      callback_url: `${base}/app/admin?billing=verify&reference=${encodeURIComponent(reference)}`,
+      metadata: { checkout_reference: reference, tenant_id: checkout.tenant_id, kind: checkout.kind, entity_id: checkout.entity_id, cancel_action: `${base}/app/admin?billing=cancelled` },
     }) });
     const data = response.data as { authorization_url?: string } | undefined;
     if (!data?.authorization_url || !data.authorization_url.startsWith('https://checkout.paystack.com/')) throw new Error('Invalid provider response');

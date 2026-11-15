@@ -53,6 +53,14 @@ Required for email flows:
 Required for billing:
 - `PAYSTACK_SECRET_KEY`
 
+Optional, for multi-host deployments:
+- `APP_ALLOWED_ORIGINS` — comma-separated **bare** origins (`scheme://host[:port]`, no path).
+  `APP_URL` is always allowed. List every other host the app is served from, e.g.
+  `https://www.techpros.com.ng,https://techpros-one.vercel.app`. This governs both the
+  write-origin (CSRF) check and the host Paystack returns the customer to. Unlisted origins
+  are rejected for writes and fall back to `APP_URL` for callbacks, so it cannot become an
+  open redirect. HTTPS is enforced for these on Vercel.
+
 Generate secrets locally:
 ```bash
 openssl rand -base64 32   # DATA_ENCRYPTION_KEY
@@ -60,18 +68,47 @@ openssl rand -hex 32      # CRON_SECRET
 ```
 
 ## 3. Apply database migrations
-From a trusted machine/CI with `DATABASE_URL` set:
+Migrations run **automatically during a Vercel production build** (`vercel-build` →
+`scripts/migrate-on-deploy.mjs`). The build container has the `DATABASE_URL` and
+`DATABASE_CA_CERT` environment variables and unrestricted database egress, so no separate
+CI secret or manual step is required.
+
+Migrations are forward-only, recorded in `schema_migrations`, and guarded by a Postgres
+advisory transaction lock, so repeated or concurrent builds are safe and become no-ops once
+the schema is current.
+
+A database failure does **not** fail the build (frontend fixes must still be able to ship);
+it prints a `MIGRATION FAILED` banner in the build log and `/api/ready` keeps reporting
+`{ ok: false, migrations: 0 }`. **Treat `/api/ready` as the authoritative signal, not the
+build status.** Fix connectivity and redeploy to apply.
+
+To run them manually from a trusted machine instead:
 ```bash
 npm ci
 npm run db:migrate
 ```
-Migrations are forward-only and advisory-locked. The API also exposes `/api/ready` to verify migration state.
 
 ## 4. Deploy
-Push to the production branch or deploy via Vercel. The SPA rewrite excludes `/api/*`. Security headers and CSP are in `vercel.json`.
+Push to the production branch or deploy via Vercel. Security headers and CSP are in `vercel.json`.
+
+Two routing details matter:
+- The API is **bundled** by `scripts/build-api.mjs` into a single `api/index.mjs`. Vercel
+  compiles `api/*.ts` with its own `nodenext` resolution, which rejects the extensionless
+  relative imports used in `server/`; bundling removes TypeScript from the function entirely.
+  Never hand-edit `api/index.mjs` — it is generated and gitignored.
+- Outside Next.js, Vercel maps `api/index.mjs` to `/api/index` only, and `[...path]` is *not*
+  a catch-all. `vercel.json` therefore rewrites `/api/(.*)` → `/api/index`; the function still
+  receives the original URL. The SPA rewrite excludes `/api/*`.
 
 ## 5. Configure integrations
 - Paystack webhook URL: `https://<origin>/api/webhooks/paystack` (event: `charge.success`). The server verifies the HMAC SHA-512 signature and re-verifies the transaction before applying entitlements.
+- **No domain registration is needed for checkout redirects.** `callback_url` is sent per
+  transaction to `/transaction/initialize` and overrides the dashboard default, so Paystack
+  will return the customer to any HTTPS origin — including `*.vercel.app`. The only
+  requirements are HTTPS in live mode and that the origin is in `APP_ALLOWED_ORIGINS`
+  (or is `APP_URL`). The customer lands on `/app/admin?billing=verify&reference=…`, which
+  verifies server-side and refreshes entitlements; cancelling returns `?billing=cancelled`.
+  The webhook remains the authoritative settlement path if the customer never returns.
 - Monitoring agents: register a device in the UI, copy the one-time ingest token, then POST telemetry to `/api/integrations/monitoring` with headers `Authorization: Bearer <token>`, `X-Tenant-Id`, `X-Device-Id`, `X-Event-Id`.
 - Scheduled jobs: `/api/cron/run` with `Authorization: Bearer <CRON_SECRET>`. `vercel.json` includes a daily cron compatible with Hobby. For production SLA responsiveness, call this endpoint every 1–5 minutes from an external scheduler or upgrade the Vercel plan.
 

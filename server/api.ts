@@ -2,7 +2,7 @@
 import { ZodError, z } from 'zod';
 import type { Database } from './db';
 import { postgres } from './db';
-import { configFromEnv, missingConfig, publicConfig, type ServerConfig } from './config';
+import { configFromEnv, missingConfig, publicConfig, requestOrigin, type ServerConfig } from './config';
 import { DomainError, applyCommand, type CommandResult } from '../src/platform/operations';
 import { commandEnvelope, registerSchema, loginSchema, tokenSchema, acceptInviteSchema, resetRequestSchema, resetSchema, mfaVerifySchema, text } from '../src/platform/contracts';
 import { authenticate, assertCsrf, contextFor, clearSessionCookies, allowedWorkspaces, register, login, completeMfa, verifyEmail, resendVerification, requestReset, resetPassword, invitationInfo, acceptInvitation, enableMfa, verifyMfaCode, type AuthUserRow } from './auth';
@@ -28,7 +28,7 @@ async function parsed<T extends z.ZodTypeAny>(request: Request, schema: T): Prom
 }
 function assertOrigin(request: Request, config: ServerConfig): void {
   const origin = request.headers.get('origin');
-  if (origin !== new URL(config.appUrl).origin) fail('Request origin is not allowed', 'ORIGIN_REJECTED', 403);
+  if (!origin || !config.allowedOrigins.includes(origin)) fail('Request origin is not allowed', 'ORIGIN_REJECTED', 403);
 }
 async function rateLimit(db: Database, key: string, limit: number, seconds: number): Promise<void> {
   const r = await db.query<{ count: number }>(`INSERT INTO rate_limits(key,window_start,count) VALUES($1,now(),1)
@@ -166,7 +166,7 @@ export async function handleApi(request: Request, deps: ApiDeps = {}): Promise<R
         const seats = await tx.query<{ count: string }>("SELECT count(*)::text AS count FROM memberships WHERE tenant_id=$1 AND status='active'", [tenantId]); if (Number(seats.rows[0].count) > PLANS[plan].seats) fail('Reduce active seats before choosing this plan', 'SEAT_LIMIT', 409);
         await tx.query("INSERT INTO checkouts(reference,tenant_id,kind,entity_id,expected_amount,created_by,expires_at) VALUES($1,$2,'subscription',$3,$4,$5,now()+interval '30 minutes')", [reference, tenantId, plan, PLANS[plan].monthlyNgn * 100, auth.user.id]);
         await audit(tx, { tenantId, actorId: auth.user.id, actorName: auth.user.name, action: 'billing.checkout_created', entity: 'checkout', entityId: reference, summary: `Prepaid monthly checkout started for ${plan}` }); });
-      return json({ url: await initializeCheckout(db, config, reference), reference });
+      return json({ url: await initializeCheckout(db, config, reference, requestOrigin(request, config)), reference });
     }
     if (path === '/api/invoices/checkout' && method === 'POST') {
       const input = await parsed(request, z.object({ id: uuid }).strict()); const tenantId = requireTenant(); const reference = `tp_inv_${randomToken().slice(0, 24)}`;
@@ -175,7 +175,7 @@ export async function handleApi(request: Request, deps: ApiDeps = {}): Promise<R
         const amount = invoiceBalanceKobo(i); if (amount <= 0) fail('Invoice has no outstanding balance', 'CONFLICT', 409);
         await tx.query("INSERT INTO checkouts(reference,tenant_id,kind,entity_id,expected_amount,created_by,expires_at) VALUES($1,$2,'invoice',$3,$4,$5,now()+interval '30 minutes')", [reference, tenantId, i.id, amount, auth.user.id]);
         await audit(tx, { tenantId, actorId: auth.user.id, action: 'invoice.checkout_created', entity: 'invoice', entityId: i.id, summary: `Verified checkout started for ${i.number}` }); });
-      return json({ url: await initializeCheckout(db, config, reference), reference });
+      return json({ url: await initializeCheckout(db, config, reference, requestOrigin(request, config)), reference });
     }
     if (path === '/api/billing/verify' && method === 'GET') {
       const reference = z.string().max(80).parse(url.searchParams.get('reference')); const tenantId = requireTenant();
