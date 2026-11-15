@@ -1,10 +1,28 @@
 # TechPros One — Go-Live Supply Checklist
 
 Everything you must provide before the merged production build can serve real customers.
-Verified against the code on `main` @ `9313b89` (not from memory).
 
-**Current state:** production is deployed and READY, but the Vercel project has **zero environment
-variables**, so every route renders the "Setup required" screen. Nothing below has been configured.
+**Current state — verified against the live deployment on 2026-11-15, not from memory:**
+
+| Check | Result |
+|---|---|
+| `GET https://techpros.com.ng/api/ready` | `{"ok":true,"database":"reachable","migrations":1}` |
+| `GET https://techpros.com.ng/api/config` | `{"mode":"live","setupRequired":[],"features":{"email":true,"billing":false,"monitoring":true}}` |
+| Database schema | **Applied.** Migration 1 ran during the Vercel production build. |
+| Nested API routing | Works — `/api/account/sessions` returns app JSON, not a Vercel 404. |
+| Marketing site + SPA | Serving on the apex, `www` 308s to it. |
+| Tier A (boot) | **Done** |
+| Tier B (sign-up) | **Done** — Resend verified on the apex, `features.email: true`. |
+| Tier C (revenue) | **Blocked on `PAYSTACK_SECRET_KEY` only** — `features.billing: false`. |
+
+Ten production environment variables are set. Migrations now run automatically on every
+production deploy (see `docs/DEPLOYMENT.md` §3); no manual database step is outstanding.
+
+**Remaining before taking money:** add `PAYSTACK_SECRET_KEY` and the webhook (§5), enter the
+DELGRA LTD identity on the tenant (§6), and publish Terms/Privacy (§7).
+
+> Rotate the Aiven database password and the Resend API key: both were shared in chat during
+> setup. Replace the values in Vercel, then redeploy.
 
 ---
 
@@ -29,7 +47,7 @@ returns `503 EMAIL_NOT_CONFIGURED` (`server/auth.ts:72`). Plan for A + B togethe
 | 2 | **Resend** | Account + **verified sending domain** | Needed for verification, invitations, password resets, notifications, scheduled reports. |
 | 3 | **Paystack** | Account **activated for live payments** + settlement bank account | Live keys require Paystack business verification (CAC/RC, business bank account). Test keys work end-to-end for rehearsal. |
 | 4 | **Vercel** | Already connected: `techpros-one` | Currently **Hobby**. Hobby cron = once/day only. See §5. |
-| 5 | **Domain + DNS** | e.g. `app.techpros.com.ng` | Optional but strongly recommended; must match `APP_URL` exactly. |
+| 5 | **Domain + DNS** | Already configured: `techpros.com.ng` | Apex is canonical (`APP_URL`); `www` 308s to it. Additional hosts (including `techpros-one.vercel.app`) go in `APP_ALLOWED_ORIGINS` — Paystack needs no domain registration. |
 | 6 | **External scheduler** | cron-job.org / EasyCron / GitHub Actions schedule | Only if you want SLA alerts faster than daily. Calls `/api/cron/run`. |
 | 7 | **Monitoring agents** | A small poller per monitored site/device | **Not shipped.** The ingest API exists; no agent binary/script does. See §7. |
 | 8 | **Backups / PITR** | Enabled at your Postgres provider + a tested restore | No backup automation is in the repo. |
