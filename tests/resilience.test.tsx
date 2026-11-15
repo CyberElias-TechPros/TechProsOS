@@ -79,3 +79,17 @@ describe('legal routes are public', () => {
     expect(isPublicRoute('/privacyish')).toBe(false);
   });
 });
+
+describe('NotFound inside the workspace', () => {
+  it('renders without the standalone auth chrome so the shell is preserved', () => {
+    const { container } = render(<MemoryRouter initialEntries={['/app/nope']}><NotFound embedded /></MemoryRouter>);
+    expect(container.querySelector('.auth-wrap')).toBeNull();
+    expect(screen.getByText(/page not found/i)).toBeTruthy();
+    expect(screen.getByText(/\/app\/nope/)).toBeTruthy();
+  });
+
+  it('offers a way back to the dashboard', () => {
+    render(<MemoryRouter initialEntries={['/app/nope']}><NotFound embedded /></MemoryRouter>);
+    expect(screen.getByRole('link', { name: /go to dashboard/i }).getAttribute('href')).toBe('/app/overview');
+  });
+});
