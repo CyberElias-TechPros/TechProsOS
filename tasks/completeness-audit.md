@@ -62,3 +62,45 @@ Each step: failing test first, then implementation, then `npm run check`.
 
 Tenant isolation and data-layer permission checks on every new path; audit on every mutation;
 no secrets; no suppressions; demo stays fictional; live never falls back to localStorage.
+
+---
+
+## Implementation result — 2026-11-15
+
+All six ordered steps are complete. Every item was reproduced with a failing test first.
+
+| Step | Gap closed | Where |
+|---|---|---|
+| 1 | A2, A3, A4 — seats, client workspaces, assistant credits | `src/platform/entitlements.ts`; enforced in `operations.ts`; meters in Admin; Assistant meters and blocks |
+| 2 | A5 — receivables ageing and dunning | `src/platform/receivables.ts`; scheduler job with per-invoice dedupe; ageing strip in Finance |
+| 3 | A1 — attachments | `DELETE /api/attachments/:id`; `AttachmentPanel` on ticket, asset and document details |
+| 4 | B1, B2, B4 — failure surfaces | `ErrorBoundary`, `NotFound`, `ConnectionBanner` |
+| 5 | B3 — findability | `src/platform/search.ts`, wired into the command palette |
+| 6 | B5 — legal | `/terms` and `/privacy`, public and linked from signup consent + footer |
+
+### Defects found while implementing (not in the original audit)
+
+- **The palette indexed the oldest tickets.** `slice(-60)` on a newest-first array meant a
+  recently created ticket was unfindable. Fixed by the new index.
+- **The palette bypassed ticket visibility.** It read `data.tickets` directly instead of
+  `visibleTickets`, so an employee could surface colleagues' tickets through search that the
+  queue correctly hid. Search now uses the same projection as the list screens.
+- **Outstanding receivables double-counted part-payments.** Finance summed gross invoice net for
+  `sent`/`overdue` and ignored `partial` entirely. It now uses the unpaid ledger balance.
+- **Documents had no detail view**, so there was nowhere to hang per-document files. Rows now
+  expand.
+
+### Verification
+
+`npm run check` green: typecheck (app + server), **20 files / 193 tests**, production build,
+`npm audit --audit-level=moderate` = 0 vulnerabilities, initial JS **131.45 KB gzip** (budget 300 KB).
+Runtime: dev server serves `/`, `/terms`, `/privacy`; the legal and search modules compile and load.
+
+Test count went 119 → 193 (+74). No existing test was weakened or deleted.
+
+### Still outside the codebase
+
+Unchanged from `docs/GO-LIVE-CHECKLIST.md`: `PAYSTACK_SECRET_KEY` and webhook, monitoring agent
+binaries, subdomain tenancy, high-frequency external cron, backup/restore drill, and a legal review
+of the two notices before commercial launch. The notices describe implemented behaviour accurately;
+they are not a substitute for counsel.
