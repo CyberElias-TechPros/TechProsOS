@@ -6,7 +6,10 @@
  * connection/setup gate. Gating everything means one missing env var takes the public
  * pricing and landing pages down too.
  */
-export const PUBLIC_PREFIXES = ['/', '/pricing', '/free-tools'] as const;
+// Terms and privacy must be reachable before signup: the consent checkbox links to them, and
+// NDPA requires an accessible notice. Auth pages stay ungated by this list but render their own
+// forms, so they are handled by the router rather than the connection gate.
+export const PUBLIC_PREFIXES = ['/', '/pricing', '/free-tools', '/terms', '/privacy'] as const;
 
 export function isPublicRoute(pathname: string): boolean {
   const path = pathname.replace(/\/+$/, '') || '/';

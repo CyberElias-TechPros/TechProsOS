@@ -11,6 +11,7 @@ import { Badge, Empty, KV, PageHead, StatusBadge, toast } from '../../components
 import { Icon } from '../../components/icons';
 import { DAYS, daysUntil, fmtDate, fmtTimeAgo, ngn, pct } from '../../platform/util';
 import { branchName, userName } from './lookups';
+import { AttachmentPanel } from './AttachmentPanel';
 
 export default function AssetDetail() {
   const { id } = useParams();
@@ -123,6 +124,7 @@ export default function AssetDetail() {
               ))}
             </div>
           )}
+          <AttachmentPanel entityId={asset.id} canUpload={can('assets.asset.update')} canManage={can('assets.asset.update')} />
           {history.length > 0 && (
             <div className="card pad-lg stack">
               <div className="lbl">Audit trail</div>

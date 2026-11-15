@@ -18,6 +18,11 @@ Everything you must provide before the merged production build can serve real cu
 Ten production environment variables are set. Migrations now run automatically on every
 production deploy (see `docs/DEPLOYMENT.md` §3); no manual database step is outstanding.
 
+**Product completeness (2026-11-15):** plan seat/client/credit limits are now enforced, unpaid
+invoices age automatically with dunning, attachments are reachable from ticket/asset/document
+details, global search covers every module, and `/terms` + `/privacy` exist and are linked from
+signup consent. See `tasks/completeness-audit.md`.
+
 **Remaining before taking money:** add `PAYSTACK_SECRET_KEY` and the webhook (§5), enter the
 DELGRA LTD identity on the tenant (§6), and publish Terms/Privacy (§7).
 

@@ -1,5 +1,5 @@
 /** Async application actions. Demo uses the local reducer; live uses the authenticated API. */
-import type { AccessContext } from './permissions';
+import { can, type AccessContext } from './permissions';
 import type { Command } from './contracts';
 import type { CommandResult } from './operations';
 import { dispatch as demoDispatch } from './db';
@@ -106,3 +106,66 @@ export async function completeAssessment(ctx: AccessContext, id: string): Promis
 export async function pauseMaintenancePlan(ctx: AccessContext, id: string, active: boolean): Promise<void> { await runCommand(ctx, { type: 'maintenance.pause', id, active }); }
 export async function createMilestone(ctx: AccessContext, projectId: string, title: string, dueAt: string): Promise<void> { await runCommand(ctx, { type: 'milestone.create', projectId, title, dueAt }); }
 export async function updateNotificationSettings(ctx: AccessContext, notificationEmails: boolean): Promise<void> { await runCommand(ctx, { type: 'tenant.update', notificationEmails }); }
+export async function consumeAssistantCredit(ctx: AccessContext): Promise<void> { await runCommand(ctx, { type: 'assistant.consume' }); }
+
+/**
+ * Attachments live outside the command reducer: the bytes go to a blob table, and removal is a
+ * genuine delete (persistDomain deliberately retains business records). Both adapters therefore
+ * call the attachment API directly and then refresh, rather than dispatching a command.
+ *
+ * The demo keeps files in memory only — it has no server and must not push multi-megabyte blobs
+ * into localStorage. That limit is stated in the panel rather than silently truncating.
+ */
+export const ATTACHMENT_MIMES = ['application/pdf', 'image/png', 'image/jpeg', 'text/plain'] as const;
+export const ATTACHMENT_MAX_BYTES = 3 * 1024 * 1024;
+export const ATTACHMENT_MAX_COUNT = 10;
+
+const demoBlobs = new Map<string, string>();
+
+export async function uploadAttachment(ctx: AccessContext, entityId: string, file: File): Promise<void> {
+  if (file.size === 0) throw new Error('The file is empty');
+  if (file.size > ATTACHMENT_MAX_BYTES) throw new Error('Files must be 3 MB or smaller');
+  if (!(ATTACHMENT_MIMES as readonly string[]).includes(file.type)) throw new Error('Attach a PDF, PNG, JPEG or plain-text file');
+  const contentBase64 = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('The file could not be read'));
+    reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '');
+    reader.readAsDataURL(file);
+  });
+  if (useData.getState().mode === 'live') {
+    await api.uploadAttachment({ entityId, name: file.name, mime: file.type, contentBase64 });
+    const snapshot = await api.workspace(); enterLive(snapshot.data, snapshot.revision, snapshot.serverTime);
+    return;
+  }
+  const existing = getData().attachments.filter(a => a.entityId === entityId);
+  if (existing.length >= ATTACHMENT_MAX_COUNT) throw new Error(`A record can hold at most ${ATTACHMENT_MAX_COUNT} files`);
+  const id = crypto.randomUUID();
+  demoBlobs.set(id, `data:${file.type};base64,${contentBase64}`);
+  const { mutate } = await import('./store');
+  mutate(d => {
+    d.attachments.unshift({ id, tenantId: ctx.tenantId, entityId, name: file.name, mime: file.type, size: file.size, createdBy: ctx.userId, createdAt: new Date().toISOString() });
+    d.auditLogs.unshift({ id: crypto.randomUUID(), tenantId: ctx.tenantId, actorId: ctx.userId, actorName: d.users.find(u => u.id === ctx.userId)?.name ?? 'Demo', action: 'attachment.uploaded', entity: 'attachment', entityId: id, summary: `Demo attachment ${file.name} added (held in memory only)`, at: new Date().toISOString() });
+  });
+}
+
+export async function removeAttachment(ctx: AccessContext, id: string): Promise<void> {
+  if (useData.getState().mode === 'live') {
+    await api.removeAttachment(id);
+    const snapshot = await api.workspace(); enterLive(snapshot.data, snapshot.revision, snapshot.serverTime);
+    return;
+  }
+  const meta = getData().attachments.find(a => a.id === id && a.tenantId === ctx.tenantId);
+  if (!meta) throw new Error('Attachment not found in this workspace');
+  if (meta.createdBy !== ctx.userId && !can(ctx, 'admin.org')) throw new Error('Only the uploader or an administrator can remove this file');
+  demoBlobs.delete(id);
+  const { mutate } = await import('./store');
+  mutate(d => {
+    d.attachments = d.attachments.filter(a => a.id !== id);
+    d.auditLogs.unshift({ id: crypto.randomUUID(), tenantId: ctx.tenantId, actorId: ctx.userId, actorName: d.users.find(u => u.id === ctx.userId)?.name ?? 'Demo', action: 'attachment.removed', entity: 'attachment', entityId: id, summary: `Demo attachment ${meta.name} removed`, at: new Date().toISOString() });
+  });
+}
+
+/** Object URL for a demo file; live files stream from the authorised endpoint. */
+export function attachmentHref(id: string): string | undefined {
+  return useData.getState().mode === 'live' ? api.attachmentUrl(id) : demoBlobs.get(id);
+}

@@ -1,5 +1,5 @@
 /** Docs & knowledge — searchable KB + controlled documents with review dates. */
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { useSessionCtx } from '../../platform/session';
 import { useData } from '../../platform/store';
 import { saveArticle, saveDocumentRecord } from '../../platform/actions';
@@ -7,6 +7,7 @@ import { Badge, Empty, Modal, PageHead, Table, Tabs, toast } from '../../compone
 import { Icon } from '../../components/icons';
 import { daysUntil, fmtDate, fmtTimeAgo } from '../../platform/util';
 import { userName } from './lookups';
+import { AttachmentPanel } from './AttachmentPanel';
 
 export default function Docs() {
   const { ctx, tenant, can } = useSessionCtx();
@@ -14,6 +15,7 @@ export default function Docs() {
   const [tab, setTab] = useState('kb');
   const [q, setQ] = useState('');
   const [openArticle, setOpenArticle] = useState<string | null>(null);
+  const [openDoc, setOpenDoc] = useState<string | null>(null);
   const [composer, setComposer] = useState<'article' | 'document' | null>(null);
 
   const articles = data.articles.filter(a => a.tenantId === ctx.tenantId);
@@ -87,14 +89,28 @@ export default function Docs() {
             {shownDocs.map(d => {
               const left = d.expiresAt ? daysUntil(d.expiresAt) : null;
               return (
-                <tr key={d.id}>
+                <Fragment key={d.id}>
+                <tr>
                   <td><div className="b sm">{d.title}</div><div className="xs muted clamp2">{d.summary}</div></td>
                   <td><Badge tone="outline">{d.kind}</Badge></td>
                   <td className="mono sm">v{d.version}</td>
                   <td className="sm">{userName(data, d.ownerId)}</td>
                   <td>{left == null ? <span className="faint sm">—</span> : left < 0 ? <Badge tone="bad">expired</Badge> : left <= 45 ? <Badge tone="warn">{left}d</Badge> : <span className="sm">{fmtDate(d.expiresAt!)}</span>}</td>
-                  <td className="xs faint">{fmtTimeAgo(d.updatedAt)}</td>
+                  <td className="xs faint">
+                    <button className="btn sm ghost" onClick={() => setOpenDoc(openDoc === d.id ? null : d.id)}
+                      aria-expanded={openDoc === d.id} aria-label={`${openDoc === d.id ? 'Hide' : 'Show'} files for ${d.title}`}>
+                      {openDoc === d.id ? 'Hide files' : 'Files'}
+                    </button>
+                  </td>
                 </tr>
+                {openDoc === d.id && (
+                  <tr key={`${d.id}-files`}>
+                    <td colSpan={6} style={{ background: 'var(--surface-2)' }}>
+                      <AttachmentPanel entityId={d.id} canUpload={can('docs.content.manage')} canManage={can('docs.content.manage')} />
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               );
             })}
           </Table>

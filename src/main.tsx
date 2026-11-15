@@ -10,6 +10,8 @@ import { ToastRegion, toast } from './components/ui';
 import { ApiError } from './platform/api';
 import { useLenis } from './app/motion';
 import { isPublicRoute } from './platform/routes';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { ConnectionBanner } from './components/ConnectionBanner';
 
 function Root() {
   useApplyTheme();
@@ -24,6 +26,7 @@ function Root() {
   if (gate && status === 'error') return <div className="auth-wrap"><main className="auth-main"><div className="auth-card stack"><h1 style={{ fontSize: 22 }}>Service unavailable</h1><p className="muted sm">{error}</p><button className="btn" onClick={() => void useLiveAuth.getState().bootstrap()}>Retry</button><a className="btn secondary" href="/">Back to home</a></div></main></div>;
   return (
     <SessionProvider value={info}>
+      <ConnectionBanner />
       <App session={info} />
       <ToastRegion />
     </SessionProvider>
@@ -40,8 +43,10 @@ if (typeof window !== 'undefined') {
 
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <Root />
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <Root />
+      </BrowserRouter>
+    </ErrorBoundary>
   </React.StrictMode>,
 );

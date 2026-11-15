@@ -5,6 +5,8 @@ import type { ServerConfig } from './config';
 import { DomainError, applyCommand } from '../src/platform/operations';
 import { accessContextFor, can } from '../src/platform/permissions';
 import { PLANS } from '../src/platform/plans';
+import { ageInvoices, daysPastDue } from '../src/platform/receivables';
+import { invoiceBalanceKobo } from '../src/platform/money';
 import type { PlanId, Ticket } from '../src/platform/types';
 import { addBusinessMinutes, addCalendarMonths, DEFAULT_SLA_TARGETS, defaultCalendar } from '../src/platform/sla';
 import { hash, randomToken } from './security';
@@ -145,13 +147,33 @@ export async function runScheduledWork(db: Database, config: ServerConfig): Prom
       }
       for (const a of d.assets.filter(a => a.warrantyExpiry && Date.parse(a.warrantyExpiry) - Date.now() < 30 * 86400000 && !['disposed', 'retired'].includes(a.lifecycle))) await once(`warranty:${a.id}:${today}`, () => notify('Warranty review', `${a.tag} · ${a.name}`, `/app/assets/${a.id}`));
       for (const doc of d.documents.filter(x => x.expiresAt && Date.parse(x.expiresAt) - Date.now() < 45 * 86400000)) await once(`document:${doc.id}:${today}`, () => notify('Document review due', doc.title, '/app/docs'));
+      // Receivables: age unpaid invoices, then chase at 1/7/30 days past due. The transition and
+      // each reminder are separately deduped so re-running the scheduler never double-notifies.
+      if (can(ctx, 'finance.invoice.view')) {
+        const scoped = d.invoices.filter(i => i.tenantId === id);
+        for (const invoiceId of ageInvoices(scoped, Date.now())) {
+          const inv = scoped.find(i => i.id === invoiceId)!;
+          await once(`invoice-overdue:${invoiceId}:${inv.dueAt}`, () => notify('Invoice overdue', `${inv.number} · ${inv.clientName}`, '/app/finance'));
+        }
+        for (const inv of scoped.filter(i => i.status === 'overdue')) {
+          const late = daysPastDue(inv, Date.now());
+          const milestone = [1, 7, 30].filter(m => late >= m).pop();
+          if (milestone === undefined || invoiceBalanceKobo(inv) <= 0) continue;
+          await once(`invoice-dunning:${inv.id}:${milestone}`, () => notify(
+            `Payment reminder: ${inv.number}`, `${inv.clientName} is ${late} days past due. Outstanding ${(invoiceBalanceKobo(inv) / 100).toLocaleString('en-NG', { minimumFractionDigits: 2 })} NGN.`, '/app/finance'));
+        }
+      }
+      // Client agreement renewals, so a provider is not surprised by a lapsed contract.
+      for (const ag of d.agreements.filter(a => a.tenantId === id && a.status === 'active' && Date.parse(a.renewsAt) - Date.now() < 30 * 86400000)) {
+        await once(`agreement-renewal:${ag.id}:${ag.renewsAt}`, () => notify('Client agreement renewing', `${ag.name} renews ${ag.renewsAt.slice(0, 10)}`, '/app/clients'));
+      }
       for (const schedule of d.reportSchedules.filter(s => s.active && Date.parse(s.nextRunAt) <= Date.now())) {
         await once(`report:${schedule.id}:${schedule.nextRunAt}`, async () => { for (const to of schedule.recipients) await enqueueEmail(tx, { tenantId: id, dedupe: `report:${schedule.id}:${schedule.nextRunAt}:${to}`, to, subject: schedule.name, text: `Your scheduled ${schedule.reportId} report is ready. Open the authorised workspace report with the saved schedule parameters:\n${config.appUrl}/app/reports?report=${schedule.reportId}&from=${encodeURIComponent(new Date(Date.now() - 30 * 86400000).toISOString())}&to=${encodeURIComponent(now)}\n\nAccess is checked when the report is opened.` }); });
         schedule.nextRunAt = schedule.cadence === 'monthly' ? addCalendarMonths(schedule.nextRunAt, 1) : new Date(Date.parse(schedule.nextRunAt) + (schedule.cadence === 'daily' ? 1 : 7) * 86400000).toISOString();
       }
       const tenant = d.tenants.find(t => t.id === id)!;
       if (tenant.subscriptionStatus === 'active' && tenant.subscriptionExpiresAt && Date.parse(tenant.subscriptionExpiresAt) < Date.now()) { tenant.subscriptionStatus = 'past_due'; changed = true; await once(`subscription-expired:${id}:${tenant.subscriptionExpiresAt}`, () => notify('Subscription renewal required', 'The prepaid subscription period has ended. Operational writes are paused; exports remain available.', '/app/admin')); }
-      if (changed) { d.auditLogs.unshift({ id: crypto.randomUUID(), tenantId: id, actorId: owner.userId, actorName: 'Scheduler', action: 'automation.scheduled_work', entity: 'tenant', entityId: id, summary: 'Idempotent maintenance, SLA, review and report jobs processed', at: now }); await persistDomain(tx, before, d, id); await afterDomainEffects(tx, before, d, id, config.appUrl); }
+      if (changed) { d.auditLogs.unshift({ id: crypto.randomUUID(), tenantId: id, actorId: owner.userId, actorName: 'Scheduler', action: 'automation.scheduled_work', entity: 'tenant', entityId: id, summary: 'Idempotent maintenance, SLA, receivables, review and report jobs processed', at: now }); await persistDomain(tx, before, d, id); await afterDomainEffects(tx, before, d, id, config.appUrl); }
     });
   }
   await db.query("DELETE FROM sessions WHERE expires_at<now()-interval '1 day'");

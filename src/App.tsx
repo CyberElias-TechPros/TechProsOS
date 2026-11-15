@@ -40,6 +40,9 @@ const Tools = lazy(() => import('./pages/workspace/Tools'));
 const Admin = lazy(() => import('./pages/workspace/Admin'));
 const AuditTrail = lazy(() => import('./pages/workspace/AuditTrail'));
 const NotificationsPage = lazy(() => import('./pages/workspace/Notifications'));
+const TermsPage = lazy(() => import('./pages/legal/Terms'));
+const PrivacyPage = lazy(() => import('./pages/legal/Privacy'));
+const NotFound = lazy(() => import('./pages/NotFound'));
 
 function Loading() {
   return (
@@ -73,6 +76,8 @@ export default function App({ session }: { session: SessionInfo | null }) {
         <Route path="/" element={<LandingPage />} />
         <Route path="/pricing" element={<PricingPage />} />
         <Route path="/free-tools" element={<FreeToolsPage />} />
+        <Route path="/terms" element={<TermsPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<OnboardingPage />} />
         <Route path="/verify-email" element={<VerifyEmailPage />} />
@@ -109,7 +114,7 @@ export default function App({ session }: { session: SessionInfo | null }) {
           <Route path="*" element={<Navigate to="/app/overview" replace />} />
         </Route>
 
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>
   );

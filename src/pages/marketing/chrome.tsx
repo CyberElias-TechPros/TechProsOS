@@ -50,6 +50,8 @@ export function MktFooter() {
           <Link to="/pricing">Pricing</Link>
           <Link to="/free-tools">Free tools</Link>
           <Link to="/signup">Get started</Link>
+          <Link to="/terms">Terms</Link>
+          <Link to="/privacy">Privacy</Link>
         </span>
       </div>
     </footer>

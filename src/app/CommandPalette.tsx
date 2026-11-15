@@ -6,6 +6,7 @@ import { useSessionInfo } from '../platform/session';
 import { useData } from '../platform/store';
 import { ALL_NAV } from './nav';
 import { Icon, type IconName } from '../components/icons';
+import { buildSearchIndex, searchRecords } from '../platform/search';
 
 interface Cmd {
   id: string;
@@ -29,31 +30,32 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
 
   const commands = useMemo<Cmd[]>(() => {
     if (!info) return [];
-    const t = info.tenant.id;
     const cmd: Cmd[] = ALL_NAV.filter(i => info.can(i.requires)).map(i => ({
       id: `nav:${i.path}`, title: `Go to ${i.label}`, icon: i.icon,
       run: () => navigate(i.path),
     }));
-    // searchable tickets + assets scoped to this tenant
-    for (const tk of data.tickets.filter(x => x.tenantId === t).slice(-60)) {
-      cmd.push({ id: `t:${tk.id}`, title: `${tk.number} — ${tk.title}`, sub: 'Ticket', icon: 'tickets', run: () => navigate(`/app/service-desk/${tk.id}`) });
-    }
-    for (const a of data.assets.filter(x => x.tenantId === t).slice(-40)) {
-      cmd.push({ id: `a:${a.id}`, title: `${a.tag} — ${a.name}`, sub: 'Asset', icon: 'assets', run: () => navigate(`/app/assets/${a.id}`) });
-    }
-    for (const d of data.devices.filter(x => x.tenantId === t).slice(-20)) {
-      cmd.push({ id: `d:${d.id}`, title: d.name, sub: 'Device', icon: 'infra', run: () => navigate(`/app/monitoring?device=${d.id}`) });
-    }
     cmd.push({ id: 'act:new-ticket', title: 'Create ticket', sub: 'Action', icon: 'plus', run: () => navigate('/app/service-desk/new') });
     cmd.push({ id: 'act:assistant', title: 'Ask the assistant', sub: 'AI', icon: 'ai', run: () => navigate('/app/assistant') });
     return cmd;
   }, [data, info, navigate]);
 
+  // Records are indexed through the permission-scoped search module, so search can never
+  // surface something the list screens would hide (previously it read data.tickets directly).
+  const records = useMemo(() => info ? buildSearchIndex(data, info.ctx) : [], [data, info]);
+
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    if (!needle) return commands.slice(0, 9);
-    return commands.filter(c => `${c.title} ${c.sub ?? ''}`.toLowerCase().includes(needle)).slice(0, 9);
-  }, [commands, q]);
+    const matchedCommands = needle
+      ? commands.filter(c => `${c.title} ${c.sub ?? ''}`.toLowerCase().includes(needle))
+      : commands;
+    if (!needle) return matchedCommands.slice(0, 9);
+    const hits = searchRecords(records, needle, 12).map<Cmd>(r => ({
+      id: `rec:${r.kind}:${r.id}`, title: r.subtitle ? `${r.title} · ${r.subtitle}` : r.title,
+      sub: r.kind, icon: r.icon, run: () => navigate(r.to),
+    }));
+    // Commands first when they match directly, then records, capped for a scannable list.
+    return [...matchedCommands.slice(0, 4), ...hits].slice(0, 14);
+  }, [commands, records, q, navigate]);
 
   useEffect(() => setSel(0), [q]);
 
@@ -69,7 +71,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       <div className="palette" role="dialog" aria-label="Command palette">
         <input ref={inputRef} value={q} onChange={e => setQ(e.target.value)} placeholder="Type a command or search…" aria-label="Command search" />
         <div className="palette-list" role="listbox">
-          {filtered.length === 0 && <div className="empty" style={{ padding: 22 }}>No matches — try a ticket code like TKT-1003</div>}
+          {filtered.length === 0 && <div className="empty" style={{ padding: 22 }}>No matches — try a ticket code, asset tag, client or document title</div>}
           {filtered.map((c, i) => (
             <button key={c.id} className="palette-item" role="option" aria-selected={i === sel}
               onMouseEnter={() => setSel(i)}

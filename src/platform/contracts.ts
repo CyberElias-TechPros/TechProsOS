@@ -82,6 +82,7 @@ export const commandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('milestone.create'), projectId: id, title: text(160), dueAt: isoDate }).strict(),
   z.object({ type: z.literal('milestone.toggle'), projectId: id, milestoneId: id }).strict(),
   z.object({ type: z.literal('client.onboard'), name: text(160), industry: text(100), city: text(100), contactName: text(120), contactEmail: email, tier: z.enum(['Essential', 'Managed', 'Premium']), monthlyFee: money }).strict(),
+  z.object({ type: z.literal('assistant.consume') }).strict(),
   z.object({ type: z.literal('vendor.create'), name: text(160), category: text(100), contact: text(120), phone: z.string().max(30), email: email.or(z.literal('')) }).strict(),
   z.object({ type: z.literal('po.create'), vendorId: id, items: z.array(poItem).min(1).max(100), branchId: id, note: z.string().max(5000).optional() }).strict(),
   z.object({ type: z.literal('po.status'), id, status: z.enum(['requested', 'approved', 'ordered', 'received', 'cancelled']), receivedBranchId: id.optional() }).strict(),
