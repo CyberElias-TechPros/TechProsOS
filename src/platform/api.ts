@@ -41,6 +41,8 @@ export const api = {
   invoiceCheckout: (id: string) => request<{ url: string; reference: string }>('/api/invoices/checkout', { method: 'POST', body: JSON.stringify({ id }) }),
   verifyBilling: (reference: string) => request<{ status: string }>(`/api/billing/verify?reference=${encodeURIComponent(reference)}`),
   uploadAttachment: (input: { entityId: string; name: string; mime: string; contentBase64: string }) => request<{ id: string }>('/api/attachments', { method: 'POST', body: JSON.stringify(input) }),
+  removeAttachment: (id: string) => request<{ ok: boolean }>(`/api/attachments/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  attachmentUrl: (id: string) => `/api/attachments/${encodeURIComponent(id)}`,
   accountProfile: (input: { name: string; phone: string; title: string }) => request<{ ok: boolean }>('/api/account/profile', { method: 'POST', body: JSON.stringify(input) }),
   changePassword: (input: { currentPassword: string; password: string; code?: string }) => request<{ ok: boolean }>('/api/account/password', { method: 'POST', body: JSON.stringify(input) }),
   mfaSetup: (password: string) => request<{ secret: string; uri: string }>('/api/account/mfa/setup', { method: 'POST', body: JSON.stringify({ password }) }),

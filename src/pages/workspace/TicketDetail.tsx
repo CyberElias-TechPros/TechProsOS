@@ -12,6 +12,7 @@ import { Icon } from '../../components/icons';
 import { fmtDuration, fmtDateTime, fmtTimeAgo } from '../../platform/util';
 import { assetLabel, branchName, userName } from './lookups';
 import { ROLE_LABELS } from '../../platform/permissions';
+import { AttachmentPanel } from './AttachmentPanel';
 
 const NEXT_STEPS: Record<TicketStatus, TicketStatus[]> = {
   new: ['triaged', 'assigned', 'closed'],
@@ -165,6 +166,7 @@ export default function TicketDetail() {
               ['Resolved', ticket.resolvedAt ? fmtDateTime(ticket.resolvedAt) : '—'],
             ]} />
           </div>
+          <AttachmentPanel entityId={ticket.id} canUpload={isOpen && (can('itsm.ticket.update') || ticket.requesterId === user.id)} canManage={can('itsm.ticket.update')} />
           {history.length > 0 && (
             <div className="card pad-lg stack">
               <div className="lbl">Audit trail</div>

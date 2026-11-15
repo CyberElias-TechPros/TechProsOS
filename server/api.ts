@@ -6,6 +6,7 @@ import { configFromEnv, missingConfig, publicConfig, requestOrigin, type ServerC
 import { DomainError, applyCommand, type CommandResult } from '../src/platform/operations';
 import { commandEnvelope, registerSchema, loginSchema, tokenSchema, acceptInviteSchema, resetRequestSchema, resetSchema, mfaVerifySchema, text } from '../src/platform/contracts';
 import { authenticate, assertCsrf, contextFor, clearSessionCookies, allowedWorkspaces, register, login, completeMfa, verifyEmail, resendVerification, requestReset, resetPassword, invitationInfo, acceptInvitation, enableMfa, verifyMfaCode, type AuthUserRow } from './auth';
+import { can } from '../src/platform/permissions';
 import { audit, loadDomain, persistDomain, afterDomainEffects, snapshot, publicUser } from './repository';
 import { cookies, hash, verifyPassword, hashPassword, randomToken, newTotpSecret, encrypt, safeEqualHex } from './security';
 import { deliverOutbox, initializeCheckout, settleCheckout, paystackWebhook, telemetrySchema, ingestTelemetry, issueDeviceToken, runScheduledWork } from './integrations';
@@ -194,6 +195,29 @@ export async function handleApi(request: Request, deps: ApiDeps = {}): Promise<R
         await tx.query("INSERT INTO records(tenant_id,id,kind,data) VALUES($1,$2,'attachments',$3::jsonb)", [tenantId, attachmentId, JSON.stringify(meta)]); await tx.query('INSERT INTO attachment_blobs(tenant_id,id,content) VALUES($1,$2,$3)', [tenantId, attachmentId, bytes]);
         await audit(tx, { tenantId, actorId: auth.user.id, actorName: auth.user.name, action: 'attachment.uploaded', entity: 'attachment', entityId: attachmentId, summary: `Validated attachment added to ${input.entityId}` }); await tx.query('UPDATE tenants SET revision=revision+1 WHERE id=$1', [tenantId]); });
       return json({ id: attachmentId }, 201);
+    }
+    if (path.startsWith('/api/attachments/') && method === 'DELETE') {
+      const attachmentId = uuid.parse(path.split('/').pop()); const tenantId = requireTenant();
+      // Removal is a real delete, so it cannot go through applyCommand/persistDomain (those
+      // retain business records by design). Scope is re-derived from the caller's own projected
+      // snapshot, so a foreign tenant sees 404 rather than 403 and learns nothing about the id.
+      await db.transaction(async tx => {
+        const ctx = await contextFor(tx, auth.user.id, tenantId); const s = await snapshot(tx, ctx);
+        const meta = s.data.attachments.find(a => a.id === attachmentId);
+        if (!meta) throw new DomainError('Attachment not found or outside your scope', 'NOT_FOUND', 404);
+        // The uploader may always withdraw their own file; otherwise removing evidence needs
+        // the same authority as managing the record it belongs to.
+        const parent = [...s.data.tickets, ...s.data.assets, ...s.data.documents].find(x => x.id === meta.entityId);
+        const manages = s.data.tickets.some(x => x.id === meta.entityId) ? can(ctx, 'itsm.ticket.update')
+          : s.data.assets.some(x => x.id === meta.entityId) ? can(ctx, 'assets.asset.update')
+          : can(ctx, 'docs.content.manage');
+        if (meta.createdBy !== auth.user.id && !manages) throw new DomainError('Only the uploader or a manager of this record can remove the file', 'FORBIDDEN', 403);
+        await tx.query('DELETE FROM attachment_blobs WHERE tenant_id=$1 AND id=$2', [tenantId, attachmentId]);
+        await tx.query("DELETE FROM records WHERE tenant_id=$1 AND id=$2 AND kind='attachments'", [tenantId, attachmentId]);
+        await audit(tx, { tenantId, actorId: auth.user.id, actorName: auth.user.name, action: 'attachment.removed', entity: 'attachment', entityId: attachmentId, summary: `Attachment "${meta.name}" removed from ${parent?.id ?? meta.entityId}` });
+        await tx.query('UPDATE tenants SET revision=revision+1 WHERE id=$1', [tenantId]);
+      });
+      return json({ ok: true });
     }
     if (path.startsWith('/api/attachments/') && method === 'GET') {
       const attachmentId = uuid.parse(path.split('/').pop()); const tenantId = requireTenant();
