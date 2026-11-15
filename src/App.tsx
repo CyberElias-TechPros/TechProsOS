@@ -111,7 +111,7 @@ export default function App({ session }: { session: SessionInfo | null }) {
           <Route path="admin/audit" element={guard('admin.audit', <AuditTrail />)} />
           <Route path="notifications" element={<NotificationsPage />} />
           <Route path="account" element={<AccountPage />} />
-          <Route path="*" element={<Navigate to="/app/overview" replace />} />
+          <Route path="*" element={<NotFound embedded />} />
         </Route>
 
         <Route path="*" element={<NotFound />} />

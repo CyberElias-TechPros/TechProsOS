@@ -18,6 +18,12 @@ Everything you must provide before the merged production build can serve real cu
 Ten production environment variables are set. Migrations now run automatically on every
 production deploy (see `docs/DEPLOYMENT.md` §3); no manual database step is outstanding.
 
+**Verified in production (2026-11-15, deployment `dpl_86aXsE6J34jNwrwsAx4NEUXmW2sb`, commit `fdb7f95`):**
+`/api/ready` → `{"ok":true,"database":"reachable","migrations":1}`; `/api/config` → live,
+`setupRequired:[]`; `/terms` renders the published notice; `/api/attachments/<id>` returns a JSON
+401 rather than SPA HTML, confirming nested API routing survived the deploy. One nodejs function,
+cron `0 6 * * *` registered, aliases assigned to apex + www + vercel.app.
+
 **Product completeness (2026-11-15):** plan seat/client/credit limits are now enforced, unpaid
 invoices age automatically with dunning, attachments are reachable from ticket/asset/document
 details, global search covers every module, and `/terms` + `/privacy` exist and are linked from

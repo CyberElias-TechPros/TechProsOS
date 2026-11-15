@@ -3,9 +3,19 @@
  * looked like the app losing the user's place. Naming the path makes the failure diagnosable.
  */
 import { Link, useLocation } from 'react-router-dom';
+import { Empty } from '../components/ui';
 
-export function NotFound() {
+/**
+ * `embedded` renders inside the workspace shell, keeping the sidebar and session so a bad
+ * in-app link does not throw the user out of their context. Standalone is for public paths.
+ */
+export function NotFound({ embedded = false }: { embedded?: boolean }) {
   const { pathname } = useLocation();
+  if (embedded) {
+    return <Empty icon="docs" title="Page not found"
+      hint={`Nothing is published at ${pathname}. The link may be out of date, or the record may have moved to another workspace.`}
+      action={<Link className="btn sm" to="/app/overview">Go to dashboard</Link>} />;
+  }
   return (
     <div className="auth-wrap">
       <main className="auth-main">
