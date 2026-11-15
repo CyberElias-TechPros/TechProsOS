@@ -1,5 +1,5 @@
 export type ServerConfig = {
-  mode: 'demo' | 'live'; appUrl: string; databaseUrl?: string; databaseCa?: string; databasePoolMax?: number; encryptionKey?: Buffer;
+  mode: 'demo' | 'live'; appUrl: string; allowedOrigins: string[]; databaseUrl?: string; databaseCa?: string; databasePoolMax?: number; encryptionKey?: Buffer;
   emailKey?: string; emailFrom?: string; paystackKey?: string; cronSecret?: string;
   secureCookies: boolean; testEmailSink?: { to: string; subject: string; text: string }[];
 };
@@ -14,7 +14,13 @@ export function configFromEnv(env: Record<string, string | undefined> = process.
   if (env.CRON_SECRET && env.CRON_SECRET.length < 32) throw new Error('CRON_SECRET must contain at least 32 characters');
   const poolMax = env.DATABASE_POOL_MAX ? Number(env.DATABASE_POOL_MAX) : undefined;
   if (poolMax !== undefined && (!Number.isInteger(poolMax) || poolMax < 1)) throw new Error('DATABASE_POOL_MAX must be a positive integer');
-  return { mode, appUrl: url.origin, databaseUrl: env.DATABASE_URL, databaseCa: env.DATABASE_CA_CERT, databasePoolMax: poolMax, encryptionKey: key,
+  const extraOrigins = (env.APP_ALLOWED_ORIGINS ?? '').split(',').map(v => v.trim()).filter(Boolean).map(v => {
+    let parsed: URL; try { parsed = new URL(v); } catch { throw new Error(`APP_ALLOWED_ORIGINS contains an invalid URL: ${v}`); }
+    if (parsed.origin !== v.replace(/\/$/, '')) throw new Error(`APP_ALLOWED_ORIGINS must be bare origins (scheme://host[:port]), got: ${v}`);
+    if (mode === 'live' && env.VERCEL && parsed.protocol !== 'https:') throw new Error('APP_ALLOWED_ORIGINS must use HTTPS on Vercel');
+    return parsed.origin;
+  });
+  return { mode, appUrl: url.origin, allowedOrigins: [...new Set([url.origin, ...extraOrigins])], databaseUrl: env.DATABASE_URL, databaseCa: env.DATABASE_CA_CERT, databasePoolMax: poolMax, encryptionKey: key,
     emailKey: env.RESEND_API_KEY, emailFrom: env.EMAIL_FROM, paystackKey: env.PAYSTACK_SECRET_KEY,
     cronSecret: env.CRON_SECRET, secureCookies: url.protocol === 'https:' };
 }
@@ -24,4 +30,15 @@ export function missingConfig(c: ServerConfig): string[] {
 }
 export function publicConfig(c: ServerConfig) {
   return { mode: c.mode, setupRequired: missingConfig(c), features: { email: !!c.emailKey && !!c.emailFrom, billing: !!c.paystackKey, monitoring: true }, version: '1.0.0-rc.1' };
+}
+
+/**
+ * Origin the browser is actually on, if we trust it; otherwise the canonical APP_URL.
+ * Payment callbacks must return the user to the host they started on, which is not
+ * necessarily APP_URL (apex vs www vs a vercel.app alias). Only explicitly configured
+ * origins are honoured, so this cannot be turned into an open redirect.
+ */
+export function requestOrigin(request: Request, config: ServerConfig): string {
+  const origin = request.headers.get('origin');
+  return origin && config.allowedOrigins.includes(origin) ? origin : config.appUrl;
 }

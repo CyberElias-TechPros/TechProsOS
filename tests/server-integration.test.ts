@@ -10,7 +10,7 @@ import type { DataSet } from '../src/platform/types';
 
 let db: Database;
 const sink: NonNullable<ServerConfig['testEmailSink']> = [];
-const config: ServerConfig = { mode: 'live', appUrl: 'https://app.test', databaseUrl: 'embedded-test', encryptionKey: Buffer.alloc(32, 7), cronSecret: 'test-cron-secret-'.padEnd(40, 'x'), paystackKey: 'test-paystack-key-not-real', secureCookies: true, testEmailSink: sink };
+const config: ServerConfig = { mode: 'live', appUrl: 'https://app.test', allowedOrigins: ['https://app.test'], databaseUrl: 'embedded-test', encryptionKey: Buffer.alloc(32, 7), cronSecret: 'test-cron-secret-'.padEnd(40, 'x'), paystackKey: 'test-paystack-key-not-real', secureCookies: true, testEmailSink: sink };
 const origin = 'https://app.test';
 async function call(path: string, method = 'GET', body?: unknown, session?: { cookie: string; csrf: string }, headers: Record<string, string> = {}) {
   const h: Record<string, string> = { Origin: origin, ...headers };

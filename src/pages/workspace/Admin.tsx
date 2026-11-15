@@ -4,6 +4,7 @@ import { useSessionCtx } from '../../platform/session';
 import { useData } from '../../platform/store';
 import { changeMemberRole, createBranch, createDepartment, inviteUser, setSubscriptionPlan, updateTenantProfile, deactivateUser, revokeInvitation } from '../../platform/actions';
 import { SlaPanel, PrivacyPanel, SchedulesPanel, DelegationsPanel, IntegrationsPanel } from './AdminPanels';
+import { BillingReturn } from './BillingReturn';
 import { PLANS, SELF_SERVE_PLANS } from '../../platform/plans';
 import { tenantUsers } from '../../platform/db';
 import { ROLE_LABELS, permissionsForRole } from '../../platform/permissions';
@@ -36,6 +37,8 @@ export default function Admin() {
       <PageHead crumbs={[tenant.name, 'Administration']} title="Administration"
         sub={`${seats} users · ${branches.length} branches · plan: ${tenant.plan}`}
         actions={isAdmin ? <button className="btn" onClick={() => setInviteOpen(true)}><Icon name="plus" size={14} /> Invite user</button> : undefined} />
+
+      <BillingReturn />
 
       <div className="card pad-lg stack">
         <Tabs tabs={[
