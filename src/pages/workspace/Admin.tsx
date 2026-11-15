@@ -5,11 +5,12 @@ import { useData } from '../../platform/store';
 import { changeMemberRole, createBranch, createDepartment, inviteUser, setSubscriptionPlan, updateTenantProfile, deactivateUser, revokeInvitation } from '../../platform/actions';
 import { SlaPanel, PrivacyPanel, SchedulesPanel, DelegationsPanel, IntegrationsPanel } from './AdminPanels';
 import { BillingReturn } from './BillingReturn';
+import { entitlementsFor } from '../../platform/entitlements';
 import { PLANS, SELF_SERVE_PLANS } from '../../platform/plans';
 import { tenantUsers } from '../../platform/db';
 import { ROLE_LABELS, permissionsForRole } from '../../platform/permissions';
 import type { RoleId } from '../../platform/types';
-import { Badge, Modal, PageHead, StatusBadge, Table, Tabs, toast, UserAvatar } from '../../components/ui';
+import { Badge, Bar, Modal, PageHead, StatusBadge, Table, Tabs, toast, UserAvatar } from '../../components/ui';
 import { Icon } from '../../components/icons';
 import { fmtTimeAgo, ngn } from '../../platform/util';
 
@@ -123,7 +124,7 @@ export default function Admin() {
         <div className="grid-2">
           <div className="card pad-lg stack">
             <h3>Current plan — {tenant.plan}</h3>
-            <p className="muted sm">Seats used: {seats}. AI assistant credits this cycle: {tenant.aiAssistCredits}.</p>
+            <UsageMeters />
             <div className="grid-2">
               {SELF_SERVE_PLANS.filter(p => (tenant.type === 'service_provider') === p.startsWith('msp_')).map(p => (
                 <button key={p} className={`card flat card-tight`} style={{ textAlign: 'left', cursor: 'pointer', border: tenant.plan === p ? '1px solid var(--accent)' : '1px solid transparent' }}
@@ -278,5 +279,41 @@ function InviteModal({ onClose }: { onClose: () => void }) {
       <p className="hint">Least-privilege default: start people as Employee or Auditor and promote deliberately. Role changes write to the audit trail.</p>
       <button className="btn block" disabled={f.name.trim().length < 3 || !/\S+@\S+\.\S+/.test(f.email)} onClick={submit}>Send invitation</button>
     </Modal>
+  );
+}
+
+/**
+ * Plan allowance meters. Seats include pending invitations because an invitation reserves a
+ * seat — showing only active members would let an admin invite past the limit and then hit a
+ * refusal with no explanation. Each meter names the action that frees allowance.
+ */
+function UsageMeters() {
+  const { ctx, tenant } = useSessionCtx();
+  const data = useData(s => s.data);
+  const { seats, clients, credits } = entitlementsFor(data, ctx.tenantId);
+  const meter = (label: string, used: number, limit: number, hint: string) => {
+    const unlimited = limit === Infinity;
+    const pct = unlimited ? 0 : Math.min(100, Math.round((used / Math.max(1, limit)) * 100));
+    const full = !unlimited && used >= limit;
+    return (
+      <div className="stack" style={{ gap: 5 }}>
+        <div className="row between sm">
+          <span className="b">{label}</span>
+          <span className={full ? 'bad' : 'muted'}>{used} / {unlimited ? 'unlimited' : limit}</span>
+        </div>
+        {!unlimited && <div aria-label={`${label}: ${used} of ${limit} used`}><Bar value={pct} tone={full ? 'var(--bad)' : 'var(--accent)'} thin /></div>}
+        <p className="xs faint">{full ? `Limit reached. ${hint}` : hint}</p>
+      </div>
+    );
+  };
+  return (
+    <div className="stack">
+      {meter('Seats', seats.used, seats.limit, `${seats.members} active members and ${seats.pending} pending invitations. Revoke an invitation or deactivate a member to free a seat.`)}
+      {tenant.type === 'service_provider' && meter('Client workspaces', clients.used, clients.limit, 'Suspending a client workspace releases its slot.')}
+      <div className="stack" style={{ gap: 5 }}>
+        <div className="row between sm"><span className="b">Assistant credits</span><span className={credits.exhausted ? 'bad' : 'muted'}>{credits.remaining} remaining</span></div>
+        <p className="xs faint">One credit per assistant answer this cycle.</p>
+      </div>
+    </div>
   );
 }

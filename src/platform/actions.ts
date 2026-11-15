@@ -106,3 +106,4 @@ export async function completeAssessment(ctx: AccessContext, id: string): Promis
 export async function pauseMaintenancePlan(ctx: AccessContext, id: string, active: boolean): Promise<void> { await runCommand(ctx, { type: 'maintenance.pause', id, active }); }
 export async function createMilestone(ctx: AccessContext, projectId: string, title: string, dueAt: string): Promise<void> { await runCommand(ctx, { type: 'milestone.create', projectId, title, dueAt }); }
 export async function updateNotificationSettings(ctx: AccessContext, notificationEmails: boolean): Promise<void> { await runCommand(ctx, { type: 'tenant.update', notificationEmails }); }
+export async function consumeAssistantCredit(ctx: AccessContext): Promise<void> { await runCommand(ctx, { type: 'assistant.consume' }); }

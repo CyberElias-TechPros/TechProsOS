@@ -4,7 +4,9 @@ import { Link } from 'react-router-dom';
 import { useSessionCtx } from '../../platform/session';
 import { useData } from '../../platform/store';
 import { askAssistant, type AssistantReply } from '../../platform/ai';
-import { PageHead } from '../../components/ui';
+import { PageHead, toast } from '../../components/ui';
+import { consumeAssistantCredit } from '../../platform/actions';
+import { creditUsage } from '../../platform/entitlements';
 import { Icon } from '../../components/icons';
 import { UserAvatar } from '../../components/ui';
 
@@ -26,28 +28,31 @@ export default function Assistant() {
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
   const scRef = useRef<HTMLDivElement>(null);
-  const credits = tenant.aiAssistCredits;
+  const { remaining: credits, exhausted } = creditUsage(data, ctx.tenantId);
 
   useEffect(() => { scRef.current?.scrollTo({ top: scRef.current.scrollHeight }); }, [msgs, busy]);
 
-  const ask = (text: string) => {
+  const ask = async (text: string) => {
     const question = text.trim();
     if (!question || busy) return;
+    if (exhausted) { toast('Assistant credits for this cycle are used up. Ask an administrator to raise the allowance.', 'bad'); return; }
     setMsgs(m => [...m, { role: 'user', text: question, at: new Date().toISOString() }]);
     setQ('');
     setBusy(true);
-    // Deterministic, local, fast — the slight delay reads as "thinking" without theatre.
-    setTimeout(() => {
+    try {
+      // Metered before answering so the quota is a real boundary, not a decorative counter.
+      await consumeAssistantCredit(ctx);
       const reply = askAssistant(data, ctx, question);
       setMsgs(m => [...m, { role: 'bot', reply, at: new Date().toISOString() }]);
-      setBusy(false);
-    }, 350);
+    } catch (error) {
+      setMsgs(m => [...m, { role: 'bot', reply: { text: (error as Error).message, basis: 'No records were read; the request was refused.' }, at: new Date().toISOString() }]);
+    } finally { setBusy(false); }
   };
 
   return (
     <div style={{ maxWidth: 900, margin: '0 auto' }} className="stack">
       <PageHead crumbs={[tenant.name, 'AI assistant']} title="Ask about your IT operation"
-        sub={`Answers come from live records in this workspace — ${credits} assistant credits this cycle.`} />
+        sub={exhausted ? 'Assistant credits for this cycle are used up. Contact an administrator to raise the allowance.' : `Answers come from live records in this workspace — ${credits} assistant credits remaining this cycle.`} />
 
       <div className="card pad-lg" style={{ display: 'flex', flexDirection: 'column', height: '62dvh', minHeight: 420 }}>
         <div className="chat-scroll" ref={scRef} style={{ flex: 1 }}>
@@ -104,14 +109,15 @@ export default function Assistant() {
           )}
         </div>
         <div className="row nowrap" style={{ borderTop: '1px solid var(--line)', paddingTop: 12, marginTop: 4 }}>
-          <input className="input" value={q} placeholder="e.g. Which sites breached SLA last month?" aria-label="Ask the assistant"
-            onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && ask(q)} />
-          <button className="btn" onClick={() => ask(q)} disabled={!q.trim() || busy} aria-label="Send">
+          <input className="input" value={q} disabled={exhausted}
+            placeholder={exhausted ? 'No assistant credits remaining this cycle' : 'e.g. Which sites breached SLA last month?'} aria-label="Ask the assistant"
+            onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && void ask(q)} />
+          <button className="btn" onClick={() => void ask(q)} disabled={!q.trim() || busy || exhausted} aria-label="Send">
             <Icon name="send" size={15} />
           </button>
         </div>
       </div>
-      <p className="xs faint" style={{ textAlign: 'center' }}>Nothing is sent to an external model in this demo. Every answer cites the records it used.</p>
+      <p className="xs faint" style={{ textAlign: 'center' }}>Answers are computed from this workspace’s records — nothing is sent to an external model. Every answer cites the records it used.</p>
     </div>
   );
 }

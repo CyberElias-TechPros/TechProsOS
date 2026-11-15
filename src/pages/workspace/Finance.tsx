@@ -5,6 +5,7 @@ import { useData } from '../../platform/store';
 import { createExpense, createInvoice, setInvoiceStatus, recordPayment } from '../../platform/actions';
 import { depreciatedValue, invoiceTotals } from '../../platform/db';
 import { invoiceBalanceKobo } from '../../platform/money';
+import { AGE_BUCKETS, ageingSummary, daysPastDue } from '../../platform/receivables';
 import { api } from '../../platform/api';
 import { invoiceNet } from '../../platform/metrics';
 import { Badge, Empty, KV, Modal, PageHead, StatusBadge, Table, Tabs, toast, Bar } from '../../components/ui';
@@ -26,7 +27,11 @@ export default function Finance() {
   const mine = data.assets.filter(a => a.tenantId === ctx.tenantId);
   const fleetValue = mine.reduce((a, x) => a + depreciatedValue(x), 0);
 
-  const outstanding = invoices.filter(i => i.status === 'sent' || i.status === 'overdue').reduce((a, i) => a + invoiceNet(i), 0);
+  const nowMs = Date.now();
+  const ageing = ageingSummary(invoices, nowMs);
+  // Outstanding is the unpaid ledger balance (includes part-payments), not the gross invoice net.
+  const outstanding = ageing.total / 100;
+  const overdueCount = invoices.filter(i => ['sent', 'partial', 'overdue'].includes(i.status) && daysPastDue(i, nowMs) > 0 && invoiceBalanceKobo(i) > 0).length;
   const paidThisMonth = invoices.filter(i => i.status === 'paid' && i.paidAt && new Date(i.paidAt).getMonth() === new Date().getMonth()).reduce((a, i) => a + invoiceNet(i), 0);
   const expTotal = expenses.reduce((a, e) => a + e.amount, 0);
   const printed = showInvoice ? invoices.find(i => i.id === showInvoice) : undefined;
@@ -43,7 +48,7 @@ export default function Finance() {
         ) : undefined} />
 
       <div className="grid-4">
-        <div className="card kpi"><span className="k-label">Outstanding</span><span className="k-value">{ngn(outstanding, { compact: true })}</span><span className="k-sub">{invoices.filter(i => i.status !== 'paid' && i.status !== 'draft').length} open invoices</span></div>
+        <div className="card kpi"><span className="k-label">Outstanding</span><span className="k-value">{ngn(outstanding, { compact: true })}</span><span className="k-sub">{overdueCount > 0 ? <span className="bad">{overdueCount} past due</span> : 'nothing past due'}</span></div>
         <div className="card kpi"><span className="k-label">Collected this month</span><span className="k-value" style={{ color: 'var(--ok)' }}>{ngn(paidThisMonth, { compact: true })}</span></div>
         <div className="card kpi"><span className="k-label">Expenses (recorded)</span><span className="k-value">{ngn(expTotal, { compact: true })}</span><span className="k-sub">{expenses.length} entries</span></div>
         <div className="card kpi"><span className="k-label">Asset book value</span><span className="k-value">{ngn(fleetValue, { compact: true })}</span><span className="k-sub">straight-line depreciation</span></div>
@@ -53,6 +58,23 @@ export default function Finance() {
         <Tabs tabs={[['invoices', `Invoices (${invoices.length})`], ['expenses', `Expenses (${expenses.length})`], ['budgets', `Budgets (${budgets.length})`]]} value={tab} onChange={setTab} />
       </div>
 
+      {tab === 'invoices' && invoices.length > 0 && (
+        <div className="card pad-lg stack no-print">
+          <div className="row between">
+            <h3>Receivables ageing</h3>
+            <span className="xs faint">Unpaid balances by days past due</span>
+          </div>
+          <div className="grid-5">
+            {AGE_BUCKETS.map(b => (
+              <div key={b} className="stack" style={{ gap: 2 }}>
+                <span className="xs muted">{b === 'current' ? 'Not yet due' : `${b} days late`}</span>
+                <b className={`sm ${b !== 'current' && ageing[b] > 0 ? 'bad' : ''}`}>{ngn(ageing[b] / 100, { compact: true })}</b>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {tab === 'invoices' && (
         invoices.length === 0 ? <Empty icon="finance" title="No invoices yet" /> : (
           <Table head={['Invoice', 'Client', 'Issued', 'Due', 'Net receivable', 'Status', '']}>
@@ -61,7 +83,7 @@ export default function Finance() {
                 <td className="mono sm">{i.number}</td>
                 <td className="b sm">{i.clientName}</td>
                 <td className="sm">{fmtDate(i.issuedAt)}</td>
-                <td className="sm">{fmtDate(i.dueAt)}</td>
+                <td className="sm">{fmtDate(i.dueAt)}{['sent', 'partial', 'overdue'].includes(i.status) && daysPastDue(i, nowMs) > 0 && invoiceBalanceKobo(i) > 0 && <span className="xs bad"> · {daysPastDue(i, nowMs)}d late</span>}</td>
                 <td className="num">{ngn(invoiceNet(i))}</td>
                 <td><StatusBadge s={i.status} /></td>
                 <td className="no-print">

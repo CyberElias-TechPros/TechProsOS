@@ -8,6 +8,7 @@ import type { DataSet, Ticket, ID, Invoice, PaymentRecord } from './types';
 import { addBusinessMinutes, addCalendarMonths, businessMinutesBetween, defaultCalendar, DEFAULT_SLA_TARGETS, priorityFrom } from './sla';
 import { invoiceBalanceKobo, toKobo, totalsKobo } from './money';
 import { projectSpend } from './metrics';
+import { seatUsage, clientUsage, creditUsage, seatLimitMessage, clientLimitMessage } from './entitlements';
 
 export type { Command } from './contracts';
 export class DomainError extends Error {
@@ -169,6 +170,9 @@ export function applyCommand(original: DataSet, ctx: AccessContext, rawCommand: 
       if (command.role.startsWith('svc_') && tenant.type !== 'service_provider') fail('Provider role requires a provider workspace');
       if (d.memberships.some(m => m.tenantId === ctx.tenantId && m.status === 'active' && d.users.find(u => u.id === m.userId)?.email === command.email)) conflict('This email is already a workspace member');
       if (d.invitations.some(i => i.tenantId === ctx.tenantId && i.email === command.email && i.status === 'pending' && Date.parse(i.expiresAt) > nowMs)) conflict('A pending invitation already exists for this email');
+      // A pending invitation reserves a seat, so this check also prevents oversubscription by invite.
+      const seats = seatUsage(d, ctx.tenantId, nowMs);
+      if (seats.exhausted) fail(seatLimitMessage(seats), 'SEAT_LIMIT', 409);
       const id = crypto.randomUUID(); d.invitations.push({ id, tenantId: ctx.tenantId, name: command.name, email: command.email, role: command.role, status: 'pending', createdAt: now, expiresAt: new Date(nowMs + 7 * 86400000).toISOString() });
       o = { entity: 'invitation', id, summary: `Invitation created for ${command.email}`, result: { id } }; break;
     }
@@ -395,13 +399,22 @@ export function applyCommand(original: DataSet, ctx: AccessContext, rawCommand: 
       o = { entity: 'project', id: p.id, summary: `Milestone ${m.done ? 'completed' : 'reopened'}` }; break;
     }
     case 'client.onboard': {
-      require('clients.client.manage'); if (tenant.type !== 'service_provider') fail('Switch to a provider workspace'); const id = crypto.randomUUID();
+      require('clients.client.manage'); if (tenant.type !== 'service_provider') fail('Switch to a provider workspace');
+      const allowance = clientUsage(d, ctx.tenantId);
+      if (allowance.exhausted) fail(clientLimitMessage(allowance), 'CLIENT_LIMIT', 409);
+      const id = crypto.randomUUID();
       d.tenants.push({ id, name: command.name, slug: `${command.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${id.slice(0, 8)}`, type: 'organisation', industry: command.industry, city: command.city, plan: 'professional', status: 'active', providerId: ctx.tenantId, createdAt: now, aiAssistCredits: 0 });
       d.branches.push({ id: crypto.randomUUID(), tenantId: id, name: `${command.city} HQ`, city: command.city, address: command.city, status: 'active' });
       d.slaPolicies.push({ id: crypto.randomUUID(), tenantId: id, name: 'Client SLA', targets: DEFAULT_SLA_TARGETS, ...defaultCalendar(), timezone: 'Africa/Lagos' });
       d.contacts.push({ id: crypto.randomUUID(), tenantId: ctx.tenantId, clientTenantId: id, name: command.contactName, role: 'Primary contact', email: command.contactEmail, phone: '', primary: true });
       d.agreements.push({ id: crypto.randomUUID(), tenantId: ctx.tenantId, clientTenantId: id, name: `${command.tier} managed IT services`, tier: command.tier, monthlyFee: command.monthlyFee, startsAt: now, renewsAt: addCalendarMonths(now, 12), status: 'active' });
       o = { entity: 'client', id, summary: 'Client workspace provisioned without inherited access', result: { id } }; break;
+    }
+    case 'assistant.consume': {
+      require('ai.assistant.use');
+      if (creditUsage(d, ctx.tenantId).exhausted) fail('Assistant credits for this cycle are used up. Contact your administrator to raise the allowance.', 'CREDIT_LIMIT', 409);
+      tenant.aiAssistCredits = Math.max(0, tenant.aiAssistCredits - 1);
+      o = { entity: 'tenant', id: tenant.id, summary: `Assistant turn consumed; ${tenant.aiAssistCredits} credits remain` }; break;
     }
     case 'vendor.create': {
       require('procurement.vendor.manage'); const id = crypto.randomUUID(); const { type: _type, ...input } = command;
