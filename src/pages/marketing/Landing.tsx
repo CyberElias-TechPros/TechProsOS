@@ -126,7 +126,7 @@ export default function LandingPage() {
               </Magnet>
             </div>
             <div className="row hero-trust">
-              {['Set up in a day', 'NDPA-ready trails', 'No card required'].map(x => (
+              {['Set up in a day', 'NDPA-ready audit trails', 'No card required'].map(x => (
                 <span key={x}><Icon name="check" size={13} style={{ color: '#34d399' }} /> {x}</span>
               ))}
             </div>
