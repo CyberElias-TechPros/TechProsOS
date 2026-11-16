@@ -5,7 +5,7 @@ import { useData } from '../../platform/store';
 import { DEMO, DEMO_USERS } from '../../platform/seed';
 import { useSession, useLiveAuth } from '../../platform/session';
 import { ROLE_LABELS } from '../../platform/permissions';
-import { toast } from '../../components/ui';
+import { toast, UserAvatar } from '../../components/ui';
 import { Icon } from '../../components/icons';
 import { api, ApiError } from '../../platform/api';
 
@@ -66,8 +66,12 @@ export default function LoginPage() {
               <div className="row" style={{ gap: 10 }}><hr className="divider" style={{ flex: 1 }} /><span className="xs faint">or jump in with a demo persona</span><hr className="divider" style={{ flex: 1 }} /></div>
               <div className="stack" style={{ gap: 8 }}>
                 {PERSONAS.map(p => { const u = data.users.find(x => x.id === p.userId); return (
-                  <button key={p.userId} className="btn secondary" style={{ justifyContent: 'flex-start', height: 'auto', padding: '10px 13px' }} onClick={() => choose(p)}>
-                    <span style={{ textAlign: 'left' }}><div style={{ fontWeight: 650, fontSize: 13 }}>{p.label}</div><div className="xs muted">{p.note} · {u ? ROLE_LABELS[data.memberships.find(m => m.userId === u.id && m.tenantId === p.tenantId)?.role ?? 'employee'] : ''}</div></span>
+                  <button key={p.userId} className="btn secondary persona" onClick={() => choose(p)}>
+                    {u && <span style={{ flex: 'none' }}><UserAvatar name={u.name} email={u.email} /></span>}
+                    <span style={{ textAlign: 'left', minWidth: 0 }}>
+                      <div style={{ fontWeight: 650, fontSize: 13 }}>{p.label}</div>
+                      <div className="xs muted">{p.note} · {u ? ROLE_LABELS[data.memberships.find(m => m.userId === u.id && m.tenantId === p.tenantId)?.role ?? 'employee'] : ''}</div>
+                    </span>
                     <Icon name="arrowRight" size={15} style={{ marginLeft: 'auto', opacity: .5 }} />
                   </button>); })}
               </div>

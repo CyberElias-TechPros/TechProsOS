@@ -24,10 +24,24 @@ const PROOF = [
   { v: 99.7, suffix: '%', decimals: 1, label: 'SLA compliance, one click away' },
   { v: 40, suffix: '%', label: 'Lighter pages than typical suites' },
   { v: 15, suffix: '', label: 'Modules that share one data fabric' },
-  { v: 13, suffix: '', label: 'Roles with least-privilege defaults' },
+  { v: 16, suffix: '', label: 'Roles with least-privilege defaults' },
 ];
 
 const LOOP_ITEMS = ['Service Desk', 'Asset Register', 'NOC Topology', 'Preventive Maintenance', 'Client Console', 'Project Delivery', 'Knowledge Base', 'Risk Register', 'Procurement', 'Naira Invoicing', 'AI Assistant', 'Audit Trail'];
+
+const FLOW: { icon: IconName; tag: string; title: string; body: string }[] = [
+  { icon: 'infra', tag: 'Detect', title: 'A device stops answering', body: 'The monitoring fabric flags it — ping, bandwidth or service check — and raises an alert with the branch, the asset and the owner already attached.' },
+  { icon: 'incident', tag: 'Respond', title: 'The alert becomes an incident', body: 'One click converts it to a priority-scored ticket against the right SLA clock. The technician never re-types what the platform already knows.' },
+  { icon: 'assets', tag: 'Resolve', title: 'Parts, work orders, cost', body: 'A work order consumes spares from stock, logs engineer time and books the cost to the branch — the asset history updates itself.' },
+  { icon: 'book', tag: 'Learn', title: 'Knowledge compounds', body: 'The fix becomes a knowledge-base article. Next time, the assistant surfaces it before the same queue fills up again.' },
+];
+
+const SECURITY: { icon: IconName; title: string; body: string }[] = [
+  { icon: 'org', title: 'Tenant isolation', body: 'Every record is scoped to its workspace at the data layer — a provider sees clients side by side, never blended.' },
+  { icon: 'shield', title: 'Least-privilege RBAC', body: 'Sixteen roles with permission-checked commands. Buttons hide, but the server refuses regardless.' },
+  { icon: 'history', title: 'Immutable audit trail', body: 'Who changed what, when and from where — retained for the records your auditors ask for.' },
+  { icon: 'lock', title: 'NDPA-ready privacy', body: 'Export, retention and formal request handling built into the admin console, not bolted on.' },
+];
 
 function HeroCard() {
   return (
@@ -82,7 +96,7 @@ export default function LandingPage() {
 
       <section className="mkt-hero hero-v2" ref={heroRef}>
         <div className="hero-bg" aria-hidden>
-          <Aurora colors={['#0a1733', '#1d63ed', '#22d3ee']} intensity={0.8} speed={0.45} />
+          <Aurora colors={['#0a1733', '#2e5bff', '#22d3ee']} intensity={0.8} speed={0.45} />
           <div className="hero-grid-bg" />
         </div>
         <div className="inner hero-split">
@@ -151,9 +165,31 @@ export default function LandingPage() {
         </div>
       </section>
 
+      <section className="mkt-section" style={{ paddingTop: 0 }}>
+        <Reveal>
+          <div className="mkt-eyebrow">The connective tissue</div>
+          <h2 className="mkt-h2">An alert becomes knowledge. <GradientText>Automatically.</GradientText></h2>
+          <p className="mkt-sub">Most suites store your data in fifteen boxes that never speak. TechPros One is one fabric — each step of an incident feeds the next, so the paperwork writes itself.</p>
+        </Reveal>
+        <div className="flow-band">
+          {FLOW.map((f, i) => (
+            <Reveal key={f.title} delay={i * 0.07}>
+              <div className="card flow-step">
+                <div className="row between">
+                  <span className="n">{i + 1}</span>
+                  <span className="tag">{f.tag}</span>
+                </div>
+                <h3><span className="row nowrap" style={{ gap: 8 }}><Icon name={f.icon} size={16} style={{ color: 'var(--accent)' }} /> {f.title}</span></h3>
+                <p>{f.body}</p>
+              </div>
+            </Reveal>
+          ))}
+        </div>
+      </section>
+
       <section className="mkt-section dual-band">
         <div className="card pad-lg dual-card">
-          <Aurora colors={['#06101f', '#0e3f8f', '#0ea5e9']} intensity={0.55} speed={0.35} />
+          <Aurora colors={['#06101f', '#0e3f8f', '#00a5c8']} intensity={0.55} speed={0.35} />
           <div className="grid-2" style={{ position: 'relative' }}>
             <div className="stack" style={{ gap: 16 }}>
               <div className="mkt-eyebrow" style={{ color: '#7db3ff', margin: 0 }}>Two workspaces, one fabric</div>
@@ -189,6 +225,25 @@ export default function LandingPage() {
               ))}
             </StaggerGroup>
           </div>
+        </div>
+      </section>
+
+      <section className="mkt-section" style={{ paddingTop: 0 }}>
+        <Reveal>
+          <div className="mkt-eyebrow">Governance, not vibes</div>
+          <h2 className="mkt-h2">Security your board can <GradientText>actually read</GradientText></h2>
+          <p className="mkt-sub">The controls aren't a marketing page — they're the ones enforcing every command you've just read about.</p>
+        </Reveal>
+        <div className="sec-band">
+          {SECURITY.map((s, i) => (
+            <Reveal key={s.title} delay={i * 0.06}>
+              <div className="card sec-item">
+                <span className="s-ico"><Icon name={s.icon} size={17} /></span>
+                <b>{s.title}</b>
+                <p>{s.body}</p>
+              </div>
+            </Reveal>
+          ))}
         </div>
       </section>
 

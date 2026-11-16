@@ -24,6 +24,7 @@ const MSP_PLANS = [
 
 export default function PricingPage() {
   const [track, setTrack] = useState<'organisation' | 'provider'>('organisation');
+  const [annual, setAnnual] = useState(false);
   const plans = track === 'organisation' ? ORG_PLANS : MSP_PLANS;
   return (
     <div className="mkt">
@@ -35,20 +36,29 @@ export default function PricingPage() {
           Every plan includes the SLA engine, audit trails, QR asset labels, free software updates and Lagos phone support.
           Prices exclude VAT (7.5%). Pay monthly or annually — two months free on annual.
         </p>
-        <div className="seg" style={{ margin: '22px 0' }}>
-          <button aria-pressed={track === 'organisation'} onClick={() => setTrack('organisation')}>For organisations</button>
-          <button aria-pressed={track === 'provider'} onClick={() => setTrack('provider')}>For IT service providers</button>
+        <div className="row" style={{ gap: 12, margin: '22px 0', flexWrap: 'wrap' }}>
+          <div className="seg" role="tablist">
+            <button aria-pressed={track === 'organisation'} onClick={() => setTrack('organisation')}>For organisations</button>
+            <button aria-pressed={track === 'provider'} onClick={() => setTrack('provider')}>For IT service providers</button>
+          </div>
+          <div className="seg" role="tablist" aria-label="Billing period">
+            <button aria-pressed={!annual} onClick={() => setAnnual(false)}>Monthly</button>
+            <button aria-pressed={annual} onClick={() => setAnnual(true)}>Annual · 2 months free</button>
+          </div>
         </div>
         <div className="grid-4">
           {plans.map((p, i) => (
             <Reveal key={p.id} delay={i * 0.06}>
               <SpotlightCard className={`pad-lg pricing-card ${p.featured ? 'featured' : ''}`} spotlightColor="rgba(90,162,255,.15)">
                 <div className="row between">
-                  <b style={{ fontSize: 16 }}>{p.name}</b>
+                  <b style={{ fontSize: 16, fontFamily: 'var(--font-display)' }}>{p.name}</b>
                   {p.featured && <Badge tone="accent">Popular</Badge>}
                 </div>
                 {'price' in p && p.price
-                  ? <div className="price">₦<CountUp to={p.price} duration={1.2} /><span>/mo</span></div>
+                  ? <div className="price">
+                      ₦<CountUp to={annual ? Math.round(p.price * 10 / 12) : p.price} duration={1.2} /><span>/mo</span>
+                      {annual && <span style={{ display: 'block' }}>billed ₦{(p.price * 10).toLocaleString('en-NG')}/yr</span>}
+                    </div>
                   : <div className="price" style={{ fontSize: 24 }}>Custom</div>}
                 <p className="muted sm" style={{ minHeight: 40 }}>{p.blurb}</p>
                 <ul className="feature-list">{p.feats.map(f => <li key={f}>{f}</li>)}</ul>
