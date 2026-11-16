@@ -4,8 +4,8 @@
   "description": "The unified IT operations and business technology platform.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0b1220",
-  "theme_color": "#0b1220",
+  "background_color": "#070c19",
+  "theme_color": "#070c19",
   "icons": [
     { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
   ]

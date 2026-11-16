@@ -9,6 +9,7 @@ import { markNotificationRead } from '../platform/actions';
 import { Icon } from '../components/icons';
 import { pretty, StatusBadge, ThemeToggle, toast, UserAvatar } from '../components/ui';
 import { navFor } from './nav';
+import { PLANS } from '../platform/plans';
 import { fmtTimeAgo } from '../platform/util';
 import { CommandPalette } from './CommandPalette';
 
@@ -41,7 +42,10 @@ function WorkspaceSwitch() {
       <button className="cur" onClick={() => setOpen(o => !o)} aria-expanded={open}>
         <span className="brand-mark" style={{ width: 26, height: 26, fontSize: 10 }}>{info.tenant.name.slice(0, 2).toUpperCase()}</span>
         <span className="txt" style={{ minWidth: 0 }}>
-          <div className="ellipsis" style={{ fontWeight: 600 }}>{info.tenant.name}</div>
+          <div className="row nowrap" style={{ gap: 6 }}>
+            <span className="ellipsis" style={{ fontWeight: 600 }}>{info.tenant.name}</span>
+            <span className="plan-pill">{PLANS[info.tenant.plan].name}</span>
+          </div>
           <div className="xs" style={{ color: 'var(--ink-muted)', fontWeight: 400 }}>{info.tenant.type === 'service_provider' ? 'Provider workspace' : info.tenant.industry}</div>
         </span>
         {info.tenants.length > 1 && <Icon name="chevronDown" size={13} style={{ marginLeft: 'auto', flex: 'none' }} />}

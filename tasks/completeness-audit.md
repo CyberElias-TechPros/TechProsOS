@@ -104,3 +104,41 @@ Unchanged from `docs/GO-LIVE-CHECKLIST.md`: `PAYSTACK_SECRET_KEY` and webhook, m
 binaries, subdomain tenancy, high-frequency external cron, backup/restore drill, and a legal review
 of the two notices before commercial launch. The notices describe implemented behaviour accurately;
 they are not a substitute for counsel.
+
+---
+
+## Phase 2 — Sitewide UI overhaul (“Aurora Enterprise” v2) — 14 November 2026
+
+**Ask:** the existing design was functional but not a showpiece; the user asked for a state-of-the-art,
+professional, business-grade UI across every surface.
+
+**Shipped** (design language documented in `docs/DESIGN-SYSTEM.md`):
+
+- **Type system:** Space Grotesk Variable (display) + Inter Variable (UI), self-hosted via fontsource.
+  Display face on headings, KPI numerals, prices, brand, stats. No JS-budget impact (CSS asset).
+- **Token refresh:** aurora palette (indigo `#2e5bff` / cyan `#00a5c8` / violet `#7c5cff`), `--grad-brand`,
+  `--grad-aurora`, layered shadows, glow tokens, spring easing. Dark theme re-tuned to match.
+- **Ambient depth:** fixed aurora mesh + SVG grain on the app background; glass (blur/saturate) topbar,
+  marketing nav, popovers, palette, dialogs; aurora hairline along card top edges.
+- **Component polish sitewide:** gradient primary buttons with glow + shine sweep; refined secondary/ghost;
+  focus-glow inputs; bordered soft badges; sticky-blur table headers with accent row hovers; KPI tiles with
+  icon chips (Overview); toast/dialog spring entrances; empty-state gradient glyphs; kanban/NOC/chat/
+  steps/timeline refinement. All via shared classes — every module inherits.
+- **Shell:** deep-space sidebar with aurora glow + gradient active pill; workspace switcher now shows the
+  plan tier (`plan-pill`); refined topbar search trigger.
+- **Marketing:** new “alert → incident → knowledge” workflow band and a security/governance band (claims
+  grounded: 16 roles — also fixed the previously wrong “13 roles” stat, tenant isolation, audit trail,
+  NDPA); glass nav with active pills and a real mobile menu (the old burger button was a dead stub);
+  professional multi-column footer with DELGRA LTD entity line; aurora-tinted hero palette.
+- **Pricing:** monthly/annual toggle implementing the advertised “two months free on annual”
+  (annual = 10× monthly, effective monthly = 10/12 rounded, billed-annually line shown); featured card
+  gets a gradient border + glow.
+- **Auth:** aurora aside (grid + glow orbs — the previously unstyled `hero-glow` class), persona buttons
+  with user avatars.
+- **Brand:** new favicon (aurora gradient T + status loupe), theme colours, `color-scheme` meta.
+- **Docs/tests:** `docs/DESIGN-SYSTEM.md` added; landing audit extended (+3 tests: workflow/security bands,
+  footer legal links + entity, nav menu button/links). 198 tests green.
+
+**Verification:** `npm run check` green — typecheck, 20 files / **198 tests**, build (only the
+pre-existing `INEFFECTIVE_DYNAMIC_IMPORT` notice, present on main before this change), 0 vulnerabilities,
+initial JS **131.49 KB gzip** (budget 300 KB).

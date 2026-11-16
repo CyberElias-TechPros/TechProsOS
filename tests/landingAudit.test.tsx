@@ -45,4 +45,28 @@ describe('landing showpiece integrity', () => {
     await new Promise(r => setTimeout(r, 700));
     expect(document.querySelectorAll('.module-card').length).toBe(6);
   });
+
+  it('renders the workflow and security bands', async () => {
+    render(<MemoryRouter><LandingPage /></MemoryRouter>);
+    await new Promise(r => setTimeout(r, 700));
+    expect(document.querySelectorAll('.flow-step').length).toBe(4);
+    expect(document.querySelectorAll('.sec-item').length).toBe(4);
+  });
+
+  it('footer carries legal links and entity identity', async () => {
+    render(<MemoryRouter><LandingPage /></MemoryRouter>);
+    await new Promise(r => setTimeout(r, 300));
+    const footer = document.querySelector('.mkt-footer') as HTMLElement;
+    expect(footer.querySelector('a[href="/terms"]')).toBeTruthy();
+    expect(footer.querySelector('a[href="/privacy"]')).toBeTruthy();
+    expect(footer.textContent).toContain('DELGRA LTD');
+  });
+
+  it('nav exposes the menu button and primary links', async () => {
+    render(<MemoryRouter><LandingPage /></MemoryRouter>);
+    await new Promise(r => setTimeout(r, 300));
+    expect(document.querySelector('.mkt-nav button[aria-label="Open menu"]')).toBeTruthy();
+    expect(document.querySelector('.mkt-nav a[href="/pricing"]')).toBeTruthy();
+    expect(document.querySelector('.mkt-nav a[href="/login"]')).toBeTruthy();
+  });
 });

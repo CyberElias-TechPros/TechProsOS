@@ -13,8 +13,8 @@ import { branchName } from './lookups';
 import { CountUp } from '../../components/bits/CountUp';
 import { Reveal } from '../../app/motion';
 
-const CHART_COLORS = { accent: '#1d63ed', ok: '#0d9263', warn: '#e8a13c', bad: '#c93a2b', info: '#0e7490', violet: '#6d5bd0' };
-const CAT_COLORS = ['#1d63ed', '#0ea5e9', '#6d5bd0', '#0d9263', '#e8a13c', '#c93a2b', '#0e7490'];
+const CHART_COLORS = { accent: '#2e5bff', ok: '#0b8a5f', warn: '#e8a13c', bad: '#c2362a', info: '#0e7490', violet: '#6d5bd0' };
+const CAT_COLORS = ['#2e5bff', '#00a5c8', '#7c5cff', '#0b8a5f', '#e8a13c', '#c2362a', '#0e7490'];
 
 export default function Overview() {
   const { user, tenant, ctx, can, role } = useSessionCtx();
@@ -50,15 +50,16 @@ export default function Overview() {
       {/* KPI strip */}
       <div className="grid-4">
         {[
-          { label: 'Open tickets', num: stats.open, to: '/app/service-desk', sub: `${stats.criticalOpen} critical`, tone: stats.criticalOpen ? 'var(--bad)' : undefined },
-          { label: 'SLA compliance', num: sla ?? undefined, suffix: '%', to: '/app/reports', sub: `${breached} breached · ${atRisk} at risk`, tone: sla != null && sla < 85 ? 'var(--warn)' : 'var(--ok)' },
-          { label: 'Fleet health', num: pct(devices.filter(d => d.status === 'up').length, Math.max(1, devices.filter(d => d.monitored).length)), suffix: '%', to: '/app/monitoring', sub: `${devices.filter(d => d.status !== 'up').length} need attention` },
+          { label: 'Open tickets', num: stats.open, to: '/app/service-desk', sub: `${stats.criticalOpen} critical`, tone: stats.criticalOpen ? 'var(--bad)' : undefined, icon: 'tickets' as const },
+          { label: 'SLA compliance', num: sla ?? undefined, suffix: '%', to: '/app/reports', sub: `${breached} breached · ${atRisk} at risk`, tone: sla != null && sla < 85 ? 'var(--warn)' : 'var(--ok)', icon: 'gauge' as const },
+          { label: 'Fleet health', num: pct(devices.filter(d => d.status === 'up').length, Math.max(1, devices.filter(d => d.monitored).length)), suffix: '%', to: '/app/monitoring', sub: `${devices.filter(d => d.status !== 'up').length} need attention`, icon: 'wifi' as const },
           isExec
-            ? { label: 'Overdue receivables', num: Math.round((inv.overdueAmount || 0) / 1000), prefix: '₦', suffix: 'k', to: '/app/finance', sub: `${inv.count} invoice${inv.count === 1 ? '' : 's'} overdue`, tone: inv.count ? 'var(--bad)' : 'var(--ok)' }
-            : { label: 'My queue', num: myQueue.length, to: '/app/service-desk', sub: 'assigned to you' },
+            ? { label: 'Overdue receivables', num: Math.round((inv.overdueAmount || 0) / 1000), prefix: '₦', suffix: 'k', to: '/app/finance', sub: `${inv.count} invoice${inv.count === 1 ? '' : 's'} overdue`, tone: inv.count ? 'var(--bad)' : 'var(--ok)', icon: 'finance' as const }
+            : { label: 'My queue', num: myQueue.length, to: '/app/service-desk', sub: 'assigned to you', icon: 'work' as const },
         ].map((k, i) => (
           <Reveal key={k.label} delay={i * 0.05} y={14}>
             <Link to={k.to!} className="card kpi overview-kpi" style={{ textDecoration: 'none', color: 'inherit' }}>
+              <span className="k-ico"><Icon name={k.icon} size={16} /></span>
               <span className="k-label">{k.label}</span>
               <span className="k-value" style={k.tone ? { color: k.tone } : undefined}>
                 {k.num == null ? '—' : <CountUp to={k.num} prefix={k.prefix ?? ''} suffix={k.suffix ?? ''} triggerOnScroll={false} />}

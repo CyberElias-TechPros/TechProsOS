@@ -14,6 +14,11 @@ export const stagger: Variants = {
   show: { transition: { staggerChildren: 0.08 } },
 };
 
+const NAV_LINKS = [
+  { to: '/pricing', label: 'Pricing' },
+  { to: '/free-tools', label: 'Free tools' },
+];
+
 export function MktNav() {
   const [open, setOpen] = useState(false);
   const session = useSessionInfo();
@@ -21,12 +26,12 @@ export function MktNav() {
     <header className="mkt-nav no-print">
       <Link to="/" className="row nowrap" style={{ gap: 9, textDecoration: 'none' }}>
         <span className="brand-mark">TP</span>
-        <span style={{ fontWeight: 700, fontSize: 15, color: 'var(--fg)' }}>TechPros One</span>
+        <span style={{ fontWeight: 700, fontSize: 15, color: 'var(--fg)', fontFamily: 'var(--font-display)' }}>TechPros One</span>
       </Link>
       <nav className="links" aria-label="Primary">
-        <NavLink to="/pricing">Pricing</NavLink>
-        <NavLink to="/free-tools">Free tools</NavLink>
-        {open ? null : null}
+        {NAV_LINKS.map(l => (
+          <NavLink key={l.to} to={l.to} className={({ isActive }) => isActive ? 'active' : ''}>{l.label}</NavLink>
+        ))}
         {session
           ? <Link to="/app/overview" className="btn sm">Open workspace <Icon name="arrowRight" size={13} /></Link>
           : (
@@ -36,7 +41,26 @@ export function MktNav() {
             </>
           )}
       </nav>
-      <button className="icon-btn" style={{ display: 'none' }} aria-label="menu" onClick={() => setOpen(!open)} />
+      <button className="icon-btn burger" aria-label={open ? 'Close menu' : 'Open menu'} aria-expanded={open} onClick={() => setOpen(o => !o)}>
+        <svg width="18" height="18" viewBox="0 0 24 24" stroke="currentColor" fill="none" strokeWidth={1.8} strokeLinecap="round">
+          {open ? <path d="M6 6l12 12M18 6L6 18" /> : <path d="M4 7h16M4 12h16M4 17h16" />}
+        </svg>
+      </button>
+      {open && (
+        <div className="mkt-nav-drawer" role="dialog" aria-label="Menu" onClick={e => e.target === e.currentTarget && setOpen(false)}>
+          <div className="sheet">
+            {NAV_LINKS.map(l => (
+              <NavLink key={l.to} to={l.to} className={({ isActive }) => isActive ? 'active' : ''} onClick={() => setOpen(false)}>{l.label}</NavLink>
+            ))}
+            {session
+              ? <Link to="/app/overview" className="btn block sm" onClick={() => setOpen(false)}>Open workspace</Link>
+              : <>
+                <Link to="/login" onClick={() => setOpen(false)}>Sign in</Link>
+                <Link to="/signup" className="btn block sm" onClick={() => setOpen(false)}>Start free</Link>
+              </>}
+          </div>
+        </div>
+      )}
     </header>
   );
 }
@@ -45,14 +69,44 @@ export function MktFooter() {
   return (
     <footer className="mkt-footer no-print">
       <div className="inner">
-        <span>© {new Date().getFullYear()} TechPros Services Ltd · Lagos, Nigeria · Built for West African businesses</span>
-        <span className="row" style={{ gap: 16 }}>
-          <Link to="/pricing">Pricing</Link>
-          <Link to="/free-tools">Free tools</Link>
-          <Link to="/signup">Get started</Link>
-          <Link to="/terms">Terms</Link>
-          <Link to="/privacy">Privacy</Link>
-        </span>
+        <div className="foot-grid">
+          <div className="foot-brand">
+            <Link to="/" className="row nowrap" style={{ gap: 9, textDecoration: 'none' }}>
+              <span className="brand-mark">TP</span>
+              <span style={{ fontWeight: 700, fontSize: 15, color: 'var(--fg)', fontFamily: 'var(--font-display)' }}>TechPros One</span>
+            </Link>
+            <p>The IT operations platform for West African organisations and the service providers who keep them running.</p>
+          </div>
+          <div className="foot-col">
+            <h5>Product</h5>
+            <ul>
+              <li><Link to="/pricing">Plans &amp; pricing</Link></li>
+              <li><Link to="/free-tools">Free IT tools</Link></li>
+              <li><Link to="/signup">Start a workspace</Link></li>
+              <li><Link to="/login">Sign in</Link></li>
+            </ul>
+          </div>
+          <div className="foot-col">
+            <h5>Modules</h5>
+            <ul>
+              <li>Service desk &amp; SLAs</li>
+              <li>Assets &amp; maintenance</li>
+              <li>Monitoring &amp; NOC</li>
+              <li>Finance &amp; compliance</li>
+            </ul>
+          </div>
+          <div className="foot-col">
+            <h5>Legal</h5>
+            <ul>
+              <li><Link to="/terms">Terms of service</Link></li>
+              <li><Link to="/privacy">Privacy notice</Link></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div className="foot-bottom">
+        <span>© {new Date().getFullYear()} DELGRA LTD (RC 9379032), trading as TechPros · Lagos, Nigeria</span>
+        <span>Built for West African businesses · support@techpros.com.ng</span>
       </div>
     </footer>
   );
